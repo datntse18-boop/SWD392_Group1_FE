@@ -43,4 +43,49 @@ export const loginUser = async (email, password) => {
     return response.data;
 };
 
+/**
+ * Get all users
+ */
+export const getAllUsers = async () => {
+    const response = await api.get('/Users');
+    return response.data;
+};
+
+/**
+ * Get user by id
+ * @param {number} id 
+ */
+export const getUserById = async (id) => {
+    const response = await api.get(`/Users/${id}`);
+    return response.data;
+};
+
+/**
+ * Create a new user
+ * @param {Object} userData 
+ */
+export const createUser = async (userData) => {
+    const response = await api.post('/Users', userData);
+    return response.data;
+};
+
+/**
+ * Update an existing user
+ * @param {number} id 
+ * @param {Object} userData 
+ */
+export const updateUser = async (id, userData) => {
+    const response = await api.put(`/Users/${id}`, userData);
+    return response.data;
+};
+
+/**
+ * Delete a user
+ * @param {number} id 
+ */
+export const deleteUser = async (id) => {
+    const response = await api.delete(`/Users/${id}`);
+    return response.data;
+};
+
 export default api;

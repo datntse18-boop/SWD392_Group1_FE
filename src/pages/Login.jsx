@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaMotorcycle } from 'react-icons/fa';
-import { Eye, EyeOff, Mail, Lock, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, Loader2, Bike } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +14,7 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { loginUser } from '@/services/api';
+import { jwtDecode } from 'jwt-decode';
 
 export default function Login() {
     const navigate = useNavigate();
@@ -36,9 +36,19 @@ export default function Login() {
         setLoading(true);
         try {
             const data = await loginUser(email, password);
-            localStorage.setItem('accessToken', data.token || data.accessToken);
+            const token = data.token || data.accessToken;
+            localStorage.setItem('accessToken', token);
             localStorage.setItem('user', JSON.stringify(data.user || data));
-            navigate('/dashboard');
+
+            // Decode token to get role claim
+            const decoded = jwtDecode(token);
+            const role = decoded['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'];
+
+            if (role === 'Admin') {
+                navigate('/dashboard');
+            } else {
+                navigate('/');
+            }
         } catch (err) {
             const msg =
                 err.response?.data?.message ||
@@ -70,7 +80,7 @@ export default function Login() {
                 {/* Content */}
                 <div className="relative z-10 flex flex-col items-center justify-center w-full px-16 text-white text-center">
                     <div className="w-20 h-20 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center mb-8 shadow-2xl animate-slide-up">
-                        <FaMotorcycle className="text-4xl text-white" />
+                        <Bike className="w-10 h-10 text-white" />
                     </div>
 
                     <h1 className="text-5xl font-extrabold tracking-tight mb-3 animate-slide-up" style={{ animationDelay: '0.1s' }}>
@@ -81,7 +91,7 @@ export default function Login() {
 
                     <p className="text-lg text-white/85 max-w-sm leading-relaxed animate-slide-up" style={{ animationDelay: '0.2s' }}>
                         The trusted marketplace for
-                        <span className="font-semibold"> pre-owned motorcycles</span>
+                        <span className="font-semibold"> new and pre-owned bicycles</span>
                     </p>
 
                     {/* Stats */}
@@ -110,7 +120,7 @@ export default function Login() {
                     {/* Mobile logo */}
                     <div className="lg:hidden flex items-center justify-center gap-2.5 mb-10">
                         <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-                            <FaMotorcycle className="text-lg text-white" />
+                            <Bike className="w-5 h-5 text-white" />
                         </div>
                         <span className="text-xl font-extrabold text-foreground">CycleTrust</span>
                     </div>
@@ -205,7 +215,7 @@ export default function Login() {
                     </Card>
 
                     <p className="text-center text-xs text-muted-foreground mt-6">
-                        © 2026 CycleTrust. Trusted motorcycle marketplace.
+                        © 2026 CycleTrust. Trusted bicycle marketplace.
                     </p>
                 </div>
             </div>
