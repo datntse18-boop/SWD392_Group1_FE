@@ -39,10 +39,27 @@ const categories = [
     { id: 10, name: 'Other', icon: PenTool, color: 'text-red-500', bgColor: 'bg-red-100' },
 ];
 
+import { getBikes } from '@/services/api';
+
 export default function Homepage() {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [user, setUser] = useState(null);
+    const [bikes, setBikes] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedCategory, setSelectedCategory] = useState(null);
+
+    const fetchBikes = async (filters = {}) => {
+        try {
+            setLoading(true);
+            const data = await getBikes(filters);
+            setBikes(data);
+        } catch (error) {
+            console.error('Error fetching bikes:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
@@ -53,12 +70,29 @@ export default function Homepage() {
                 console.error("Failed to parse user from localStorage", e);
             }
         }
+
+        // Initial fetch
+        fetchBikes();
     }, []);
 
     const handleSearch = (e) => {
         e.preventDefault();
-        // Implement search logic later
-        console.log('Searching for:', searchQuery);
+        fetchBikes({
+            searchTitle: searchQuery,
+            categoryId: selectedCategory
+        });
+    };
+
+    const handleCategoryClick = (categoryId) => {
+        // Toggle selection
+        const newCategory = selectedCategory === categoryId ? null : categoryId;
+        setSelectedCategory(newCategory);
+
+        // Fetch with new category and current search text
+        fetchBikes({
+            searchTitle: searchQuery,
+            categoryId: newCategory
+        });
     };
 
     const handleLoginClick = () => {
@@ -239,12 +273,13 @@ export default function Homepage() {
                                 {categories.map((cat) => (
                                     <div
                                         key={cat.id}
-                                        className="flex flex-col items-center justify-center p-4 border-r border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors group h-auto aspect-square sm:aspect-auto sm:h-32 text-center"
+                                        onClick={() => handleCategoryClick(cat.id)}
+                                        className={`flex flex-col items-center justify-center p-4 border-r border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors group h-auto aspect-square sm:aspect-auto sm:h-32 text-center ${selectedCategory === cat.id ? 'bg-orange-50 border-orange-200 shadow-inner' : ''}`}
                                     >
                                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200 ${cat.bgColor}`}>
                                             <cat.icon className={`w-6 h-6 ${cat.color}`} />
                                         </div>
-                                        <span className="text-xs font-medium text-gray-700 leading-tight group-hover:text-[#F56218] transition-colors">
+                                        <span className={`text-xs font-medium leading-tight group-hover:text-[#F56218] transition-colors ${selectedCategory === cat.id ? 'text-[#F56218] font-bold' : 'text-gray-700'}`}>
                                             {cat.name}
                                         </span>
                                     </div>
@@ -256,33 +291,44 @@ export default function Homepage() {
 
                 {/* Listings */}
                 <section>
-                    <h2 className="text-xl font-bold text-gray-800 mb-4">Latest Listings</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((item) => (
-                            <Card key={item} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group border-0 shadow-sm">
-                                <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden flex items-center justify-center">
-                                    <div className="absolute inset-0 flex items-center justify-center text-gray-300 group-hover:scale-105 transition-transform duration-300">
-                                        <Bike className="w-16 h-16 opacity-50" />
+                    <h2 className="text-xl font-bold text-gray-800 mb-4">
+                        {loading ? 'Loading...' : (bikes.length > 0 ? 'Latest Listings' : 'No bikes found')}
+                    </h2>
+
+                    {!loading && bikes.length > 0 && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                            {bikes.map((bike) => (
+                                <Card key={bike.bikeId} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group border-0 shadow-sm">
+                                    <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden flex items-center justify-center">
+                                        {bike.imageUrls && bike.imageUrls.length > 0 ? (
+                                            <img src={bike.imageUrls[0]} alt={bike.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                        ) : (
+                                            <div className="absolute inset-0 flex items-center justify-center text-gray-300 group-hover:scale-105 transition-transform duration-300">
+                                                <Bike className="w-16 h-16 opacity-50" />
+                                            </div>
+                                        )}
+                                        {bike.bikeCondition && (
+                                            <div className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 rounded text-[10px] font-bold text-gray-700 shadow-sm">
+                                                {bike.bikeCondition}
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 rounded text-[10px] font-bold text-gray-700 shadow-sm">
-                                        Like New
-                                    </div>
-                                </div>
-                                <CardContent className="p-3">
-                                    <h3 className="text-sm font-medium text-gray-800 line-clamp-2 mb-2 group-hover:text-[#F56218] transition-colors">
-                                        Trek Marlin 5 Gen 2, Crystal White - 2023 Model
-                                    </h3>
-                                    <div className="text-[#D94E0A] font-bold text-base mb-2">
-                                        $450.00
-                                    </div>
-                                    <div className="flex items-center text-xs text-gray-500 gap-1 mt-auto">
-                                        <MapPin className="w-3 h-3" />
-                                        <span className="truncate">Cau Giay, Hanoi</span>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
+                                    <CardContent className="p-3">
+                                        <h3 className="text-sm font-medium text-gray-800 line-clamp-2 mb-2 group-hover:text-[#F56218] transition-colors" title={bike.title}>
+                                            {bike.title}
+                                        </h3>
+                                        <div className="text-[#D94E0A] font-bold text-base mb-2">
+                                            {bike.price == 0 ? 'Contact for price' : new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(bike.price)}
+                                        </div>
+                                        <div className="flex items-center text-xs text-gray-500 gap-1 mt-auto">
+                                            <User className="w-3 h-3" />
+                                            <span className="truncate">{bike.sellerName}</span>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    )}
 
                     <div className="mt-8 flex justify-center">
                         <Button variant="outline" className="w-full sm:w-auto px-8 py-6 rounded-xl border-orange-200 text-[#F56218] hover:bg-orange-50 font-medium">

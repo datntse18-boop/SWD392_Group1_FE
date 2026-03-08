@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'https://localhost:7271/api',
+    // baseURL: 'https://localhost:7271/api',
+    baseURL: 'http://localhost:5026/api',
     headers: {
         'Content-Type': 'application/json',
     },
@@ -85,6 +86,23 @@ export const updateUser = async (id, userData) => {
  */
 export const deleteUser = async (id) => {
     const response = await api.delete(`/Users/${id}`);
+    return response.data;
+};
+
+/**
+ * Get all bikes with optional filters
+ * @param {Object} filters
+ */
+export const getBikes = async (filters = {}) => {
+    const params = new URLSearchParams();
+
+    if (filters.categoryId) params.append('categoryId', filters.categoryId);
+    if (filters.brandId) params.append('brandId', filters.brandId);
+    if (filters.minPrice) params.append('minPrice', filters.minPrice);
+    if (filters.maxPrice) params.append('maxPrice', filters.maxPrice);
+    if (filters.searchTitle) params.append('searchTitle', filters.searchTitle);
+
+    const response = await api.get(`/Bikes?${params.toString()}`);
     return response.data;
 };
 
