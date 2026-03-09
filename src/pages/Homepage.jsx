@@ -48,6 +48,8 @@ export default function Homepage() {
     const [bikes, setBikes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState(null);
+    const [minPrice, setMinPrice] = useState('');
+    const [maxPrice, setMaxPrice] = useState('');
 
     const fetchBikes = async (filters = {}) => {
         try {
@@ -79,7 +81,9 @@ export default function Homepage() {
         e.preventDefault();
         fetchBikes({
             searchTitle: searchQuery,
-            categoryId: selectedCategory
+            categoryId: selectedCategory,
+            minPrice: minPrice ? parseFloat(minPrice) : null,
+            maxPrice: maxPrice ? parseFloat(maxPrice) : null
         });
     };
 
@@ -88,10 +92,12 @@ export default function Homepage() {
         const newCategory = selectedCategory === categoryId ? null : categoryId;
         setSelectedCategory(newCategory);
 
-        // Fetch with new category and current search text
+        // Fetch with new category and current search text/prices
         fetchBikes({
             searchTitle: searchQuery,
-            categoryId: newCategory
+            categoryId: newCategory,
+            minPrice: minPrice ? parseFloat(minPrice) : null,
+            maxPrice: maxPrice ? parseFloat(maxPrice) : null
         });
     };
 
@@ -224,10 +230,28 @@ export default function Homepage() {
                                     </div>
                                     <Input
                                         type="text"
-                                        placeholder="Search for bicycles, parts, and accessories..."
+                                        placeholder="Search bikes..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full pl-10 h-12 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none text-base bg-white text-gray-900"
+                                        className="w-full pl-10 h-12 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none text-base bg-white text-gray-900 border-r border-gray-200"
+                                    />
+                                </div>
+                                <div className="hidden sm:flex flex-1 max-w-[150px]">
+                                    <Input
+                                        type="number"
+                                        placeholder="Min Price (₫)"
+                                        value={minPrice}
+                                        onChange={(e) => setMinPrice(e.target.value)}
+                                        className="w-full h-12 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none text-sm bg-white text-gray-900 border-r border-gray-200"
+                                    />
+                                </div>
+                                <div className="hidden sm:flex flex-1 max-w-[150px]">
+                                    <Input
+                                        type="number"
+                                        placeholder="Max Price (₫)"
+                                        value={maxPrice}
+                                        onChange={(e) => setMaxPrice(e.target.value)}
+                                        className="w-full h-12 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none shadow-none text-sm bg-white text-gray-900"
                                     />
                                 </div>
                             </div>
@@ -298,7 +322,11 @@ export default function Homepage() {
                     {!loading && bikes.length > 0 && (
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                             {bikes.map((bike) => (
-                                <Card key={bike.bikeId} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group border-0 shadow-sm">
+                                <Card
+                                    key={bike.bikeId}
+                                    onClick={() => navigate(`/bike/${bike.bikeId}`)}
+                                    className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group border-0 shadow-sm"
+                                >
                                     <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden flex items-center justify-center">
                                         {bike.imageUrls && bike.imageUrls.length > 0 ? (
                                             <img src={bike.imageUrls[0]} alt={bike.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />

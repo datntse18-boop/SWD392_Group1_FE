@@ -106,4 +106,13 @@ export const getBikes = async (filters = {}) => {
     return response.data;
 };
 
+/**
+ * Get bike details by ID
+ * @param {number} id 
+ */
+export const getBikeById = async (id) => {
+    const response = await api.get(`/Bikes/${id}`);
+    return response.data;
+};
+
 export default api;
