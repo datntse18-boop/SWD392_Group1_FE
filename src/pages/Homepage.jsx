@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getAllBikes } from '../services/api';
 import {
     Search,
     Heart,
@@ -43,6 +44,8 @@ export default function Homepage() {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [user, setUser] = useState(null);
+    const [bikes, setBikes] = useState([]);
+    const [loadingBikes, setLoadingBikes] = useState(true);
 
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
@@ -53,6 +56,27 @@ export default function Homepage() {
                 console.error("Failed to parse user from localStorage", e);
             }
         }
+
+        const fetchLatestBikes = async () => {
+            try {
+                const data = await getAllBikes();
+                // Show approved, available AND pending bikes for development/test visibility
+                const displayedBikes = data.filter(b =>
+                    b.status === "APPROVED" ||
+                    b.status === "AVAILABLE" ||
+                    b.status === "PENDING" ||
+                    !b.status
+                );
+                // Sort by ID descending (newest first)
+                setBikes(displayedBikes.sort((a, b) => b.bikeId - a.bikeId).slice(0, 10));
+            } catch (err) {
+                console.error("Failed to fetch bikes for homepage", err);
+            } finally {
+                setLoadingBikes(false);
+            }
+        };
+
+        fetchLatestBikes();
     }, []);
 
     const handleSearch = (e) => {
@@ -144,7 +168,10 @@ export default function Homepage() {
                                             <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">
                                                 Profile Management
                                             </button>
-                                            <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">
+                                            <button
+                                                onClick={() => navigate('/seller/dashboard')}
+                                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                                            >
                                                 My Listings
                                             </button>
                                             <div className="h-px bg-gray-100 my-1"></div>
@@ -168,6 +195,7 @@ export default function Homepage() {
                             )}
 
                             <Button
+                                onClick={() => navigate('/seller/dashboard')}
                                 className="bg-white text-[#F56218] hover:bg-gray-100 border-0 rounded-full px-4 sm:px-6 h-10 font-bold flex items-center gap-2 shadow-sm"
                             >
                                 <span className="hidden sm:block">POST AD</span>
@@ -257,38 +285,67 @@ export default function Homepage() {
                 {/* Listings */}
                 <section>
                     <h2 className="text-xl font-bold text-gray-800 mb-4">Latest Listings</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((item) => (
-                            <Card key={item} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group border-0 shadow-sm">
-                                <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden flex items-center justify-center">
-                                    <div className="absolute inset-0 flex items-center justify-center text-gray-300 group-hover:scale-105 transition-transform duration-300">
-                                        <Bike className="w-16 h-16 opacity-50" />
+                    {loadingBikes ? (
+                        <div className="flex justify-center p-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+                        </div>
+                    ) : bikes.length === 0 ? (
+                        <div className="text-center py-12 text-gray-500 bg-white rounded-xl shadow-sm border border-gray-100 italic">
+                            No listings available yet. Be the first to post a bike ad!
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                            {bikes.map((bike) => (
+                                <Card key={bike.bikeId} onClick={() => navigate(`/bikes/${bike.bikeId}`)} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group border-0 shadow-sm flex flex-col h-full">
+                                    <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden flex items-center justify-center">
+                                        {bike.imageUrls && bike.imageUrls.length > 0 ? (
+                                            <img
+                                                src={bike.imageUrls[0].startsWith('http') || bike.imageUrls[0].startsWith('data:image') ? bike.imageUrls[0] : `http://localhost:5026${bike.imageUrls[0]}`}
+                                                alt={bike.title}
+                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                            />
+                                        ) : (
+                                            <div className="absolute inset-0 flex items-center justify-center text-gray-300 group-hover:scale-105 transition-transform duration-300">
+                                                <Bike className="w-16 h-16 opacity-50" />
+                                            </div>
+                                        )}
+                                        <div className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 rounded text-[10px] font-bold text-gray-700 shadow-sm uppercase">
+                                            {bike.bikeCondition === 'USED_LIKE_NEW' ? 'Like New' : bike.bikeCondition?.replace('USED_', '') || 'USED'}
+                                        </div>
                                     </div>
-                                    <div className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 rounded text-[10px] font-bold text-gray-700 shadow-sm">
-                                        Like New
-                                    </div>
-                                </div>
-                                <CardContent className="p-3">
-                                    <h3 className="text-sm font-medium text-gray-800 line-clamp-2 mb-2 group-hover:text-[#F56218] transition-colors">
-                                        Trek Marlin 5 Gen 2, Crystal White - 2023 Model
-                                    </h3>
-                                    <div className="text-[#D94E0A] font-bold text-base mb-2">
-                                        $450.00
-                                    </div>
-                                    <div className="flex items-center text-xs text-gray-500 gap-1 mt-auto">
-                                        <MapPin className="w-3 h-3" />
-                                        <span className="truncate">Cau Giay, Hanoi</span>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
+                                    <CardContent className="p-3 flex flex-col flex-grow">
+                                        <h3 className="text-sm font-medium text-gray-800 line-clamp-2 mb-2 group-hover:text-[#F56218] transition-colors">
+                                            {bike.title}
+                                        </h3>
+                                        <div className="text-[#D94E0A] font-bold text-base mb-2">
+                                            {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(bike.price)}
+                                        </div>
+                                        <div className="flex items-center justify-between text-xs text-gray-500 mt-auto">
+                                            <div className="flex items-center gap-1">
+                                                <MapPin className="w-3 h-3" />
+                                                <span className="truncate max-w-[80px]">Local</span>
+                                            </div>
+                                            {bike.isAnonymous ? (
+                                                <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-bold">Anonymous</span>
+                                            ) : (
+                                                <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded font-bold truncate max-w-[80px]">
+                                                    {bike.sellerName || 'Seller'}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    )}
 
-                    <div className="mt-8 flex justify-center">
-                        <Button variant="outline" className="w-full sm:w-auto px-8 py-6 rounded-xl border-orange-200 text-[#F56218] hover:bg-orange-50 font-medium">
-                            Load More Listings
-                        </Button>
-                    </div>
+                    {!loadingBikes && bikes.length > 0 && (
+                        <div className="mt-8 flex justify-center">
+                            <Button variant="outline" className="w-full sm:w-auto px-8 py-6 rounded-xl border-orange-200 text-[#F56218] hover:bg-orange-50 font-medium">
+                                Load More Listings
+                            </Button>
+                        </div>
+                    )}
                 </section>
 
             </main>
@@ -299,6 +356,6 @@ export default function Homepage() {
                     <p>© 2026 CycleTrust. Trusted bicycle marketplace.</p>
                 </div>
             </footer>
-        </div>
+        </div >
     );
 }

@@ -3,6 +3,7 @@ import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
 import Homepage from '@/pages/Homepage';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import SellerDashboard from '@/pages/SellerDashboard'; // Import Dashboard for SELLER
 
 function App() {
   return (
@@ -13,8 +14,16 @@ function App() {
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['Admin', 'ADMIN']}>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/seller/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={['Seller', 'SELLER', 'Admin', 'ADMIN']}>
+              <SellerDashboard />
             </ProtectedRoute>
           }
         />
