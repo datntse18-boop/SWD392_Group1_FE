@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getBikeById } from '@/services/api';
-import { ArrowLeft, User, MapPin, CheckCircle, Tag } from 'lucide-react';
+import { getBikeById, uploadBikeImage } from '@/services/api';
+import { ArrowLeft, User, MapPin, CheckCircle, Tag, ImagePlus, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export default function BikeDetails() {
     const { id } = useParams();
@@ -9,25 +10,57 @@ export default function BikeDetails() {
     const [bike, setBike] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [user, setUser] = useState(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
+    const fetchBikeDetails = async () => {
+        try {
+            setLoading(true);
+            const data = await getBikeById(id);
+            setBike(data);
+        } catch (err) {
+            console.error("Error fetching bike details:", err);
+            setError("Failed to load bike details. It may have been removed.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchBikeDetails = async () => {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
             try {
-                setLoading(true);
-                const data = await getBikeById(id);
-                setBike(data);
-            } catch (err) {
-                console.error("Error fetching bike details:", err);
-                setError("Failed to load bike details. It may have been removed.");
-            } finally {
-                setLoading(false);
+                setUser(JSON.parse(storedUser));
+            } catch (e) {
+                console.error("Failed to parse user", e);
             }
-        };
+        }
 
         if (id) {
             fetchBikeDetails();
         }
     }, [id]);
+
+    const handleFileChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            setIsUploading(true);
+            await uploadBikeImage(id, file);
+            // Refresh details to show new image
+            await fetchBikeDetails();
+        } catch (err) {
+            console.error("Upload failed:", err);
+            const errorMsg = err.response?.data?.message || err.response?.data || err.message || "Failed to upload image. Please try again.";
+            alert(`Upload failed: ${errorMsg}`);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const isOwner = user && bike && user.userId === bike.sellerId;
 
     if (loading) {
         return (
@@ -66,25 +99,69 @@ export default function BikeDetails() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
                 {/* Left Column: Images */}
                 <div className="space-y-4">
-                    <div className="aspect-[4/3] bg-gray-100 rounded-2xl overflow-hidden border border-gray-200">
+                    <div className="aspect-[4/3] bg-gray-100 rounded-2xl overflow-hidden border border-gray-200 shadow-sm relative group">
                         {bike.imageUrls && bike.imageUrls.length > 0 ? (
-                            <img src={bike.imageUrls[0]} alt={bike.title} className="w-full h-full object-cover" />
+                            <div className="relative w-full h-full group">
+                                <img
+                                    src={bike.imageUrls[selectedImageIndex] || bike.imageUrls[0]}
+                                    alt={bike.title}
+                                    className="w-full h-full object-cover transition-all duration-500"
+                                />
+                                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        className="bg-white/90 backdrop-blur-sm text-gray-900 border-0"
+                                        onClick={() => window.open(bike.imageUrls[selectedImageIndex] || bike.imageUrls[0], '_blank')}
+                                    >
+                                        View Full Size
+                                    </Button>
+                                </div>
+                            </div>
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-400">
                                 No image available
                             </div>
                         )}
                     </div>
-                    {/* Thumbnail grid (if multiple images) */}
-                    {bike.imageUrls && bike.imageUrls.length > 1 && (
-                        <div className="grid grid-cols-4 gap-2">
-                            {bike.imageUrls.map((url, index) => (
-                                <div key={index} className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity">
-                                    <img src={url} alt={`${bike.title} thumbnail ${index + 1}`} className="w-full h-full object-cover" />
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                    {/* Thumbnail grid (if multiple images or if owner) */}
+                    <div className="flex flex-wrap gap-2">
+                        {bike.imageUrls && bike.imageUrls.map((url, index) => (
+                            <div
+                                key={index}
+                                onClick={() => setSelectedImageIndex(index)}
+                                className={`w-20 sm:w-24 aspect-square rounded-lg overflow-hidden border-2 transition-all cursor-pointer hover:opacity-100 ${selectedImageIndex === index ? 'border-[#F56218] shadow-md opacity-100 scale-105' : 'border-gray-200 opacity-70'}`}
+                            >
+                                <img src={url} alt={`${bike.title} thumbnail ${index + 1}`} className="w-full h-full object-cover" />
+                            </div>
+                        ))}
+
+                        {isOwner && (
+                            <div className="relative">
+                                <input
+                                    type="file"
+                                    id="bike-image-upload"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={handleFileChange}
+                                    disabled={isUploading}
+                                />
+                                <label
+                                    htmlFor="bike-image-upload"
+                                    className={`w-20 sm:w-24 aspect-square flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#F56218] hover:bg-orange-50 transition-all ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                                >
+                                    {isUploading ? (
+                                        <Loader2 className="w-6 h-6 text-[#F56218] animate-spin" />
+                                    ) : (
+                                        <>
+                                            <ImagePlus className="w-6 h-6 text-gray-400 mb-1" />
+                                            <span className="text-[10px] font-medium text-gray-500 text-center px-1">Add Photo</span>
+                                        </>
+                                    )}
+                                </label>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Right Column: Details */}

@@ -115,4 +115,20 @@ export const getBikeById = async (id) => {
     return response.data;
 };
 
+/**
+ * Upload bike image to Cloudinary via Backend
+ * @param {number} bikeId 
+ * @param {File} file 
+ */
+export const uploadBikeImage = async (bikeId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post(`/Bikes/${bikeId}/images`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
+    return response.data;
+};
+
 export default api;
