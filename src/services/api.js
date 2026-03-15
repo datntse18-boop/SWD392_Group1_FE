@@ -172,6 +172,50 @@ export const getBikeById = async (id) => {
 };
 
 /**
+ * Get all orders
+ */
+export const getOrders = async () => {
+    const response = await api.get('/Orders');
+    return response.data;
+};
+
+/**
+ * Get order by ID
+ * @param {number} orderId
+ */
+export const getOrderById = async (orderId) => {
+    const response = await api.get(`/Orders/${orderId}`);
+    return response.data;
+};
+
+/**
+ * Create a new order
+ * @param {Object} payload
+ */
+export const createOrder = async (payload) => {
+    const response = await api.post('/Orders', payload);
+    return response.data;
+};
+
+/**
+ * Buyer confirms received bike
+ * @param {number} orderId
+ */
+export const confirmOrderReceived = async (orderId) => {
+    const response = await api.put(`/Orders/${orderId}/received`);
+    return response.data;
+};
+
+/**
+ * Fake payment confirm callback (VietQR demo)
+ * @param {number} orderId
+ */
+export const confirmPayment = async (orderId) => {
+    const response = await api.post('/Payment/confirm', { orderId });
+    return response.data;
+};
+
+/**
  * Create a bike listing (status will be handled by backend, expected PENDING)
  * @param {Object} payload
  */

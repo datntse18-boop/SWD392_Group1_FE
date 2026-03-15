@@ -1,18 +1,41 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminListings from './AdminListings';
 import AdminUsers from './AdminUsers';
 import { Bike } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getUserById } from '@/services/api';
 
 const menuItems = [
+    { key: 'profile', label: 'My Profile', icon: '🙍' },
     { key: 'listings', label: 'Ad posting management', icon: '🏍️' },
     { key: 'users', label: 'User management', icon: '👥' },
 ];
 
 export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState('listings');
+    const [user, setUser] = useState(null);
     const navigate = useNavigate();
+
+    useEffect(() => {
+        const initUser = async () => {
+            const userDataString = localStorage.getItem('user');
+            if (!userDataString) return;
+
+            const parsedUser = JSON.parse(userDataString);
+
+            try {
+                const fullUser = await getUserById(parsedUser.userId);
+                const mergedUser = { ...parsedUser, ...fullUser };
+                setUser(mergedUser);
+                localStorage.setItem('user', JSON.stringify(mergedUser));
+            } catch {
+                setUser(parsedUser);
+            }
+        };
+
+        initUser();
+    }, []);
 
     const handleLogout = () => {
         localStorage.removeItem('accessToken');
@@ -105,6 +128,19 @@ export default function AdminDashboard() {
 
                     {activeTab === 'listings' && <AdminListings />}
                     {activeTab === 'users' && <AdminUsers />}
+                    {activeTab === 'profile' && (
+                        <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm max-w-3xl">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-4">Account Information</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div><p className="text-gray-500">Full Name</p><p className="font-medium text-gray-900">{user?.fullName || '--'}</p></div>
+                                <div><p className="text-gray-500">Email</p><p className="font-medium text-gray-900">{user?.email || '--'}</p></div>
+                                <div><p className="text-gray-500">Phone</p><p className="font-medium text-gray-900">{user?.phone || '--'}</p></div>
+                                <div><p className="text-gray-500">Address</p><p className="font-medium text-gray-900">{user?.address || '--'}</p></div>
+                                <div><p className="text-gray-500">Role</p><p className="font-medium text-gray-900">{user?.roleName || 'ADMIN'}</p></div>
+                                <div><p className="text-gray-500">Status</p><p className="font-medium text-gray-900">{user?.status || 'ACTIVE'}</p></div>
+                            </div>
+                        </div>
+                    )}
                 </section>
             </main>
         </div>

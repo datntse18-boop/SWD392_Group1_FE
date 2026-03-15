@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bike, ShoppingCart, Plus, LogOut, Loader2, ShieldAlert, CheckCircle2 } from 'lucide-react';
-import { getBikes, requestBikeInspection } from '@/services/api';
+import { Bike, ShoppingCart, Plus, LogOut, Loader2, ShieldAlert, CheckCircle2, MessageCircle, UserCircle2 } from 'lucide-react';
+import { getBikes, getOrders, getUserById, requestBikeInspection } from '@/services/api';
 
 const menuItems = [
+    { key: 'profile', label: 'My Profile', icon: <UserCircle2 className="w-5 h-5" /> },
     { key: 'listings', label: 'My Listings', icon: <Bike className="w-5 h-5" /> },
     { key: 'sales', label: 'My Sales', icon: <ShoppingCart className="w-5 h-5" /> },
 ];
@@ -15,6 +16,9 @@ export default function SellerDashboard() {
     const [listingsLoading, setListingsLoading] = useState(false);
     const [listingsError, setListingsError] = useState('');
     const [requestLoadingId, setRequestLoadingId] = useState(null);
+    const [salesOrders, setSalesOrders] = useState([]);
+    const [salesLoading, setSalesLoading] = useState(false);
+    const [salesError, setSalesError] = useState('');
     const navigate = useNavigate();
 
     const normalizeUpper = (value) => String(value || '').toUpperCase();
@@ -38,13 +42,47 @@ export default function SellerDashboard() {
         }
     };
 
-    useEffect(() => {
-        const userDataString = localStorage.getItem('user');
-        if (userDataString) {
-            const parsedUser = JSON.parse(userDataString);
-            setUser(parsedUser);
-            fetchListings(parsedUser);
+    const fetchSalesOrders = async (currentUser) => {
+        if (!currentUser?.userId) return;
+
+        setSalesLoading(true);
+        setSalesError('');
+
+        try {
+            const data = await getOrders();
+            const sellerOrders = (Array.isArray(data) ? data : []).filter(
+                (order) => Number(order?.sellerId) === Number(currentUser.userId)
+            );
+            setSalesOrders(sellerOrders);
+        } catch (err) {
+            setSalesError(err.response?.data?.message || 'Failed to load sales orders.');
+        } finally {
+            setSalesLoading(false);
         }
+    };
+
+    useEffect(() => {
+        const initUser = async () => {
+            const userDataString = localStorage.getItem('user');
+            if (!userDataString) return;
+
+            const parsedUser = JSON.parse(userDataString);
+
+            try {
+                const fullUser = await getUserById(parsedUser.userId);
+                const mergedUser = { ...parsedUser, ...fullUser };
+                setUser(mergedUser);
+                localStorage.setItem('user', JSON.stringify(mergedUser));
+                fetchListings(mergedUser);
+                fetchSalesOrders(mergedUser);
+            } catch {
+                setUser(parsedUser);
+                fetchListings(parsedUser);
+                fetchSalesOrders(parsedUser);
+            }
+        };
+
+        initUser();
     }, []);
 
     const handleRequestInspection = async (bikeId) => {
@@ -63,6 +101,17 @@ export default function SellerDashboard() {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('user');
         navigate('/login');
+    };
+
+    const handleChatWithBuyer = (order) => {
+        if (!order?.buyerId) return;
+
+        navigate(`/chat?userId=${order.buyerId}&bikeId=${order.bikeId || ''}`, {
+            state: {
+                sellerName: order.buyerName,
+                bikeTitle: order.bikeTitle,
+            },
+        });
     };
 
     return (
@@ -126,12 +175,14 @@ export default function SellerDashboard() {
                     <div className="flex justify-between items-end mb-8">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-900">
-                                {activeTab === 'listings' ? 'My Listings' : 'Sales Orders'}
+                                {activeTab === 'listings' ? 'My Listings' : activeTab === 'sales' ? 'Sales Orders' : 'My Profile'}
                             </h2>
                             <p className="text-sm text-gray-500 mt-1">
-                                {activeTab === 'listings' 
-                                    ? 'Manage your bike listings, track their approval status.' 
-                                    : 'Manage orders from buyers and update transaction status.'}
+                                {activeTab === 'listings'
+                                    ? 'Manage your bike listings, track their approval status.'
+                                    : activeTab === 'sales'
+                                        ? 'Manage orders from buyers and update transaction status.'
+                                        : 'View your personal account information.'}
                             </p>
                         </div>
                         
@@ -241,17 +292,87 @@ export default function SellerDashboard() {
                                     </div>
                                 )}
                             </>
+                        ) : activeTab === 'sales' ? (
+                            <>
+                                {salesLoading ? (
+                                    <div className="flex flex-col items-center justify-center h-full pt-12 pb-20">
+                                        <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
+                                        <p className="text-sm text-gray-500">Loading sales orders...</p>
+                                    </div>
+                                ) : salesError ? (
+                                    <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">
+                                        {salesError}
+                                    </div>
+                                ) : salesOrders.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-full pt-12 pb-20">
+                                        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                                            <ShoppingCart className="w-8 h-8 text-slate-400" />
+                                        </div>
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                                            No sales yet
+                                        </h3>
+                                        <p className="text-gray-500 text-sm mb-6 text-center max-w-sm">
+                                            Orders from buyers will appear here after deposit payment.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {salesOrders.map((order) => {
+                                            const status = normalizeUpper(order.status);
+                                            const isDeposited = status === 'DEPOSITED';
+                                            return (
+                                                <div key={order.orderId} className="rounded-xl border border-gray-200 p-4">
+                                                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                                        <div>
+                                                            <h3 className="font-semibold text-gray-900">{order.bikeTitle}</h3>
+                                                            <p className="text-sm text-gray-500 mt-1">Order #{order.orderId}</p>
+                                                            <p className="text-sm text-gray-500">Buyer: {order.buyerName}</p>
+                                                            <p className="text-sm text-gray-500">Total: {Number(order.totalAmount || 0).toLocaleString('vi-VN')}₫</p>
+                                                            <p className="text-sm text-gray-500">Deposit: {Number(order.depositAmount || 0).toLocaleString('vi-VN')}₫</p>
+                                                            {isDeposited && (
+                                                                <p className="mt-2 inline-flex items-center rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+                                                                    Buyers who have already paid a deposit should contact them immediately.
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            {isDeposited && (
+                                                                <button
+                                                                    onClick={() => handleChatWithBuyer(order)}
+                                                                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium transition-colors"
+                                                                >
+                                                                    <MessageCircle className="w-4 h-4" />
+                                                                    Chat Buyer
+                                                                </button>
+                                                            )}
+                                                            <span className={`inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium border ${
+                                                                status === 'DEPOSITED'
+                                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                                    : status === 'COMPLETED'
+                                                                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                                                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                                                            }`}>
+                                                                {order.status}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </>
                         ) : (
-                            <div className="flex flex-col items-center justify-center h-full pt-12 pb-20">
-                                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                                    <ShoppingCart className="w-8 h-8 text-slate-400" />
+                            <div className="max-w-2xl rounded-2xl border border-gray-200 bg-gray-50 p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Account Information</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                    <div><p className="text-gray-500">Full Name</p><p className="font-medium text-gray-900">{user?.fullName || '--'}</p></div>
+                                    <div><p className="text-gray-500">Email</p><p className="font-medium text-gray-900">{user?.email || '--'}</p></div>
+                                    <div><p className="text-gray-500">Phone</p><p className="font-medium text-gray-900">{user?.phone || '--'}</p></div>
+                                    <div><p className="text-gray-500">Address</p><p className="font-medium text-gray-900">{user?.address || '--'}</p></div>
+                                    <div><p className="text-gray-500">Role</p><p className="font-medium text-gray-900">{user?.roleName || 'SELLER'}</p></div>
+                                    <div><p className="text-gray-500">Status</p><p className="font-medium text-gray-900">{user?.status || 'ACTIVE'}</p></div>
                                 </div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                                    No sales yet
-                                </h3>
-                                <p className="text-gray-500 text-sm mb-6 text-center max-w-sm">
-                                    When someone orders your listed bike, it will appear here for you to process.
-                                </p>
                             </div>
                         )}
                     </div>

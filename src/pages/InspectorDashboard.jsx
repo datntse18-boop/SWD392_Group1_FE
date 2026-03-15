@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardCheck, LogOut, Loader2, CheckCircle2, Eye } from 'lucide-react';
-import { getPendingInspectionRequests, getInspectionReports, getBikeById } from '@/services/api';
+import { ClipboardCheck, LogOut, Loader2, CheckCircle2, Eye, UserCircle2 } from 'lucide-react';
+import { getPendingInspectionRequests, getInspectionReports, getBikeById, getUserById } from '@/services/api';
 
 const menuItems = [
+    { key: 'profile', label: 'My Profile', icon: <UserCircle2 className="w-5 h-5" /> },
     { key: 'inspections', label: 'Pending Inspections', icon: <ClipboardCheck className="w-5 h-5" /> },
-    { key: 'completed', label: 'Inspected Bikes', icon: <CheckCircle2 className="w-5 h-5" /> }
+    { key: 'completed', label: 'Inspected Bikes', icon: <CheckCircle2 className="w-5 h-5" /> },
+    
 ];
 
 export default function InspectorDashboard() {
@@ -91,28 +93,89 @@ export default function InspectorDashboard() {
                 const ownReports = (Array.isArray(data) ? data : []).filter(
                     (item) => Number(item.inspectorId || item.inspector?.userId) === inspectorId
                 );
-                setCompletedRequests(ownReports.map(mapInspectionReport).filter(
-                    (item) => item.status === 'APPROVED' || item.status === 'REJECTED'
-                ));
+
+                const ownMapped = ownReports
+                    .map(mapInspectionReport)
+                    .filter((item) => item.status === 'APPROVED' || item.status === 'REJECTED');
+
+                const enrichedOwnMapped = await Promise.all(
+                    ownMapped.map(async (item) => {
+                        if (item.seller && item.seller !== 'Unknown Seller') {
+                            return item;
+                        }
+
+                        if (!item.bikeId) {
+                            return item;
+                        }
+
+                        try {
+                            const bike = await getBikeById(item.bikeId);
+                            return {
+                                ...item,
+                                seller: bike?.sellerName || bike?.seller?.fullName || item.seller,
+                            };
+                        } catch {
+                            return item;
+                        }
+                    })
+                );
+
+                setCompletedRequests(enrichedOwnMapped);
                 return;
             }
 
-            setCompletedRequests(completed);
+            const enrichedCompleted = await Promise.all(
+                completed.map(async (item) => {
+                    if (item.seller && item.seller !== 'Unknown Seller') {
+                        return item;
+                    }
+
+                    if (!item.bikeId) {
+                        return item;
+                    }
+
+                    try {
+                        const bike = await getBikeById(item.bikeId);
+                        return {
+                            ...item,
+                            seller: bike?.sellerName || bike?.seller?.fullName || item.seller,
+                        };
+                    } catch {
+                        return item;
+                    }
+                })
+            );
+
+            setCompletedRequests(enrichedCompleted);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to load inspected bikes.');
         }
     };
 
     useEffect(() => {
-        const userDataString = localStorage.getItem('user');
-        let parsedUser = null;
-        if (userDataString) {
-            parsedUser = JSON.parse(userDataString);
-            setUser(parsedUser);
-        }
+        const initUser = async () => {
+            const userDataString = localStorage.getItem('user');
+            let parsedUser = null;
 
-        fetchPendingRequests();
-        fetchCompletedRequests(parsedUser);
+            if (userDataString) {
+                parsedUser = JSON.parse(userDataString);
+
+                try {
+                    const fullUser = await getUserById(parsedUser.userId);
+                    const mergedUser = { ...parsedUser, ...fullUser };
+                    setUser(mergedUser);
+                    localStorage.setItem('user', JSON.stringify(mergedUser));
+                    parsedUser = mergedUser;
+                } catch {
+                    setUser(parsedUser);
+                }
+            }
+
+            fetchPendingRequests();
+            fetchCompletedRequests(parsedUser);
+        };
+
+        initUser();
     }, []);
 
     const handleLogout = () => {
@@ -181,12 +244,14 @@ export default function InspectorDashboard() {
                     {/* Header */}
                     <div className="mb-8">
                         <h2 className="text-2xl font-bold text-gray-900">
-                            {activeTab === 'inspections' ? 'Pending Inspections' : 'Inspected Bikes'}
+                            {activeTab === 'inspections' ? 'Pending Inspections' : activeTab === 'completed' ? 'Inspected Bikes' : 'My Profile'}
                         </h2>
                         <p className="text-sm text-gray-500 mt-1">
                             {activeTab === 'inspections'
                                 ? 'Review and inspect bikes before they are fully listed on the marketplace.'
-                                : 'Bikes that you already inspected with final decision.'}
+                                : activeTab === 'completed'
+                                    ? 'Bikes that you already inspected with final decision.'
+                                    : 'View your personal account information.'}
                         </p>
                     </div>
 
@@ -251,7 +316,7 @@ export default function InspectorDashboard() {
                                     ))}
                                 </tbody>
                             </table>
-                        ) : completedRequests.length === 0 ? (
+                        ) : activeTab === 'completed' && completedRequests.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-20">
                                 <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
                                     <CheckCircle2 className="w-8 h-8 text-gray-400" />
@@ -263,12 +328,13 @@ export default function InspectorDashboard() {
                                     Completed inspections will appear here after you submit a result.
                                 </p>
                             </div>
-                        ) : (
+                        ) : activeTab === 'completed' ? (
                             <table className="w-full">
                                 <thead>
                                     <tr className="border-b border-gray-100 bg-gray-50/50">
                                         <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">ID</th>
                                         <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Bike Title</th>
+                                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Seller</th>
                                         <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Result</th>
                                         <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Inspected Date</th>
                                         <th className="text-right px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
@@ -279,6 +345,7 @@ export default function InspectorDashboard() {
                                         <tr key={request.reportId} className="hover:bg-gray-50 transition-colors">
                                             <td className="px-6 py-4 text-sm text-gray-500">#{request.bikeId}</td>
                                             <td className="px-6 py-4 text-sm font-medium text-gray-900">{request.title}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-600">{request.seller || 'Unknown Seller'}</td>
                                             <td className="px-6 py-4 text-sm">
                                                 <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
                                                     request.status === 'APPROVED'
@@ -293,7 +360,7 @@ export default function InspectorDashboard() {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <button
-                                                    onClick={() => navigate(`/bikes/${request.bikeId}`)}
+                                                    onClick={() => navigate(`/bike/${request.bikeId}`)}
                                                     className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium rounded-lg transition-colors cursor-pointer border border-gray-200"
                                                 >
                                                     <Eye className="w-4 h-4" />
@@ -304,6 +371,18 @@ export default function InspectorDashboard() {
                                     ))}
                                 </tbody>
                             </table>
+                        ) : (
+                            <div className="m-6 max-w-2xl rounded-2xl border border-gray-200 bg-gray-50 p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Account Information</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                    <div><p className="text-gray-500">Full Name</p><p className="font-medium text-gray-900">{user?.fullName || '--'}</p></div>
+                                    <div><p className="text-gray-500">Email</p><p className="font-medium text-gray-900">{user?.email || '--'}</p></div>
+                                    <div><p className="text-gray-500">Phone</p><p className="font-medium text-gray-900">{user?.phone || '--'}</p></div>
+                                    <div><p className="text-gray-500">Address</p><p className="font-medium text-gray-900">{user?.address || '--'}</p></div>
+                                    <div><p className="text-gray-500">Role</p><p className="font-medium text-gray-900">{user?.roleName || 'INSPECTOR'}</p></div>
+                                    <div><p className="text-gray-500">Status</p><p className="font-medium text-gray-900">{user?.status || 'ACTIVE'}</p></div>
+                                </div>
+                            </div>
                         )}
                     </div>
                 </div>

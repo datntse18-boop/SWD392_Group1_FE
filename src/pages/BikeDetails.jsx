@@ -371,7 +371,7 @@ export default function BikeDetails() {
                                 onClick={() => navigate(`/checkout/${bike.bikeId}`)}
                                 className="flex-1 bg-[#F56218] hover:bg-[#D94E0A] text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-sm"
                             >
-                                Buy Now
+                                Order Now
                             </button>
                         </div>
                     </div>

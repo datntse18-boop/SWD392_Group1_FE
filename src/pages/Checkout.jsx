@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, Lock, CreditCard, CheckCircle } from 'lucide-react';
-import { getBikeById } from '@/services/api';
+import { ArrowLeft, CheckCircle, Loader2 } from 'lucide-react';
+import { createOrder, getBikeById } from '@/services/api';
 
 export default function Checkout() {
     const { id } = useParams();
     const navigate = useNavigate();
     const [bike, setBike] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [processing, setProcessing] = useState(false);
+    const [creatingOrder, setCreatingOrder] = useState(false);
+    const [error, setError] = useState('');
 
     useEffect(() => {
         const fetchBikeDetails = async () => {
@@ -24,18 +25,33 @@ export default function Checkout() {
         fetchBikeDetails();
     }, [id]);
 
-    const handleCheckout = async (e) => {
+    const handleCreateOrder = async (e) => {
         e.preventDefault();
-        setProcessing(true);
+        setCreatingOrder(true);
+        setError('');
+
+        const rawUser = localStorage.getItem('user');
+        if (!rawUser) {
+            navigate('/login');
+            return;
+        }
+
+        const currentUser = JSON.parse(rawUser);
+
         try {
-            // Mock payment processing
-            await new Promise(res => setTimeout(res, 2000));
-            alert('Deposit successful! Order placed.');
-            navigate('/dashboard'); // Go back to buyer dashboard
+            const order = await createOrder({
+                bikeId: Number(bike.bikeId),
+                buyerId: Number(currentUser.userId),
+                sellerId: Number(bike.sellerId),
+                totalAmount: Number(bike.price || 0),
+                depositAmount: Number(depositAmount),
+            });
+
+            navigate(`/orders/${order.orderId}`);
         } catch (err) {
-            alert('Payment failed.');
+            setError(err.response?.data?.message || 'Failed to create order.');
         } finally {
-            setProcessing(false);
+            setCreatingOrder(false);
         }
     };
 
@@ -72,87 +88,45 @@ export default function Checkout() {
                 </button>
 
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
-                    <p className="text-gray-500 mt-2">Secure your bike with a deposit.</p>
+                    <h1 className="text-3xl font-bold text-gray-900">Create Order</h1>
+                    <p className="text-gray-500 mt-2">Review order information before paying 10% deposit.</p>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Left Column: Form */}
                     <div className="lg:col-span-2 space-y-6">
-                        <form onSubmit={handleCheckout} className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
-                            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                                <CreditCard className="w-5 h-5 text-primary" />
-                                Payment Details
+                        <form onSubmit={handleCreateOrder} className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
+                            <h2 className="text-xl font-bold text-gray-900 mb-6">
+                                Confirm Order
                             </h2>
 
-                            <div className="space-y-5">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-700">Name on Card</label>
-                                    <input 
-                                        type="text" 
-                                        required
-                                        placeholder="John Doe"
-                                        className="w-full h-11 px-4 rounded-lg border border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm"
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-700">Card Number</label>
-                                    <div className="relative">
-                                        <input 
-                                            type="text" 
-                                            required
-                                            placeholder="0000 0000 0000 0000"
-                                            className="w-full h-11 pl-4 pr-10 rounded-lg border border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm"
-                                        />
-                                        <CreditCard className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-700">Expiry Date</label>
-                                        <input 
-                                            type="text" 
-                                            required
-                                            placeholder="MM/YY"
-                                            className="w-full h-11 px-4 rounded-lg border border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-700">CVC</label>
-                                        <input 
-                                            type="text" 
-                                            required
-                                            placeholder="123"
-                                            className="w-full h-11 px-4 rounded-lg border border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm"
-                                        />
-                                    </div>
-                                </div>
+                            <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700 space-y-2">
+                                <p><span className="font-semibold">Bike:</span> {bike.title}</p>
+                                <p><span className="font-semibold">Seller:</span> {bike.sellerName || 'Unknown Seller'}</p>
+                                <p><span className="font-semibold">Total:</span> {bike.price?.toLocaleString('vi-VN')}₫</p>
+                                <p><span className="font-semibold">Deposit (10%):</span> {depositAmount.toLocaleString('vi-VN')}₫</p>
                             </div>
 
-                            <button 
-                                type="submit" 
-                                disabled={processing}
+                            {error && (
+                                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 text-red-700 px-3 py-2 text-sm">
+                                    {error}
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={creatingOrder}
                                 className="w-full mt-8 bg-black hover:bg-gray-900 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
                             >
-                                {processing ? (
+                                {creatingOrder ? (
                                     <>
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        Processing...
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Creating Order...
                                     </>
                                 ) : (
-                                    <>
-                                        <Lock className="w-4 h-4" />
-                                        Pay Deposit ({depositAmount.toLocaleString('vi-VN')}₫)
-                                    </>
+                                    'Continue to Order Detail'
                                 )}
                             </button>
-
-                            <p className="flex items-center justify-center gap-1.5 mt-4 text-xs text-gray-500 text-center">
-                                <ShieldCheck className="w-4 h-4 text-green-600" />
-                                Payments are secure and encrypted.
-                            </p>
                         </form>
                     </div>
 

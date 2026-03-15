@@ -14,6 +14,8 @@ import InspectionForm from '@/pages/InspectionForm';
 import Checkout from '@/pages/Checkout';
 import SellerRequest from '@/pages/SellerRequest';
 import Chat from '@/pages/Chat';
+import OrderDetail from '@/pages/OrderDetail';
+import PaymentPage from '@/pages/PaymentPage';
 
 function App() {
   return (
@@ -26,6 +28,30 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['BUYER']}>
               <Checkout />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/order/:orderId"
+          element={
+            <ProtectedRoute allowedRoles={['BUYER']}>
+              <OrderDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/orders/:orderId"
+          element={
+            <ProtectedRoute allowedRoles={['BUYER']}>
+              <OrderDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payment/:orderId"
+          element={
+            <ProtectedRoute allowedRoles={['BUYER']}>
+              <PaymentPage />
             </ProtectedRoute>
           }
         />
