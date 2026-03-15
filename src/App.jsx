@@ -12,6 +12,7 @@ import BuyerDashboard from '@/pages/BuyerDashboard';
 import InspectorDashboard from '@/pages/InspectorDashboard';
 import InspectionForm from '@/pages/InspectionForm';
 import Checkout from '@/pages/Checkout';
+import SellerRequest from '@/pages/SellerRequest';
 
 function App() {
   return (
@@ -77,6 +78,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/seller-request" element={<SellerRequest />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

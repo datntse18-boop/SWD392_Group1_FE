@@ -18,7 +18,8 @@ import {
     Shirt,
     Shield,
     Wrench,
-    Navigation
+    Navigation,
+    Store,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -111,6 +112,8 @@ export default function Homepage() {
         setUser(null);
     };
 
+    const isBuyer = user?.roleName?.toUpperCase() === 'BUYER';
+
     return (
         <div className="min-h-screen bg-gray-50 font-sans">
             {/* ====== HEADER ====== */}
@@ -154,6 +157,16 @@ export default function Homepage() {
                                 <MessageCircle className="w-5 h-5" />
                                 <span className="text-sm font-medium">Chat</span>
                             </button>
+
+                            {isBuyer && (
+                                <Button
+                                    onClick={() => navigate('/seller-request')}
+                                    className="hidden lg:flex items-center gap-2 bg-white text-[#F56218] hover:bg-gray-100 border-0 rounded-full px-4 h-9 text-sm font-semibold shadow-sm"
+                                >
+                                    <Store className="w-4 h-4" />
+                                    Become a Seller
+                                </Button>
+                            )}
 
                             <div className="h-6 w-px bg-white/30 hidden lg:block mx-1"></div>
 
