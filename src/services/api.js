@@ -134,11 +134,49 @@ export const getBikes = async (filters = {}) => {
 };
 
 /**
+ * Get all brands
+ */
+export const getBrands = async () => {
+    const response = await api.get('/Brands');
+    return response.data;
+};
+
+/**
+ * Get all categories
+ */
+export const getCategories = async () => {
+    const response = await api.get('/Categories');
+    return response.data;
+};
+
+/**
+ * Get bike condition options
+ * Falls back to client defaults if endpoint is unavailable
+ */
+export const getBikeConditions = async () => {
+    try {
+        const response = await api.get('/Bikes/conditions');
+        return response.data;
+    } catch {
+        return ['New', 'Like New', 'Used', 'Needs Repair'];
+    }
+};
+
+/**
  * Get bike details by ID
  * @param {number} id 
  */
 export const getBikeById = async (id) => {
     const response = await api.get(`/Bikes/${id}`);
+    return response.data;
+};
+
+/**
+ * Create a bike listing (status will be handled by backend, expected PENDING)
+ * @param {Object} payload
+ */
+export const createBikeListing = async (payload) => {
+    const response = await api.post('/Bikes', payload);
     return response.data;
 };
 

@@ -1,24 +1,91 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Bike, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Upload, Bike, Loader2, AlertCircle, CheckCircle2, Image as ImageIcon, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import {
+    createBikeListing,
+    uploadBikeImage,
+    getBrands,
+    getCategories,
+    getBikeConditions,
+} from '@/services/api';
 
 export default function CreateListing() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+    const [metaLoading, setMetaLoading] = useState(true);
     const [error, setError] = useState('');
-    
-    // Using string IDs for simplicity; in a real app, these would be fetched from backend categories/brands APIs.
+    const [successMessage, setSuccessMessage] = useState('');
+    const [selectedImages, setSelectedImages] = useState([]);
+    const [previewUrls, setPreviewUrls] = useState([]);
+    const [brands, setBrands] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [conditions, setConditions] = useState([]);
+
     const [formData, setFormData] = useState({
         title: '',
         description: '',
         price: '',
-        brandId: '',  
+        brandId: '',
         categoryId: '',
         frameSize: '',
         condition: 'Used',
     });
+
+    useEffect(() => {
+        const urls = selectedImages.map((file) => ({ file, url: URL.createObjectURL(file) }));
+        setPreviewUrls(urls);
+
+        return () => {
+            urls.forEach((item) => URL.revokeObjectURL(item.url));
+        };
+    }, [selectedImages]);
+
+    useEffect(() => {
+        const fetchMetaData = async () => {
+            setMetaLoading(true);
+            try {
+                const [brandData, categoryData, conditionData] = await Promise.all([
+                    getBrands(),
+                    getCategories(),
+                    getBikeConditions(),
+                ]);
+
+                setBrands(Array.isArray(brandData) ? brandData : []);
+                setCategories(Array.isArray(categoryData) ? categoryData : []);
+
+                const normalizedConditions = Array.isArray(conditionData)
+                    ? conditionData.map((item) => {
+                        if (typeof item === 'string') return item;
+                        return item.name || item.conditionName || item.value || String(item);
+                    })
+                    : [];
+
+                const finalConditions = normalizedConditions.length > 0
+                    ? normalizedConditions
+                    : ['New', 'Like New', 'Used', 'Needs Repair'];
+
+                setConditions(finalConditions);
+                setFormData((prev) => ({
+                    ...prev,
+                    condition: finalConditions.includes(prev.condition)
+                        ? prev.condition
+                        : finalConditions[0],
+                }));
+            } catch {
+                setError('Failed to load brands/categories. Please refresh and try again.');
+            } finally {
+                setMetaLoading(false);
+            }
+        };
+
+        fetchMetaData();
+    }, []);
 
     const handleChange = (e) => {
         setFormData({
@@ -27,200 +94,278 @@ export default function CreateListing() {
         });
     };
 
+    const handleImagesChange = (e) => {
+        const files = Array.from(e.target.files || []);
+        if (!files.length) return;
+
+        const imageFiles = files.filter((file) => file.type.startsWith('image/'));
+        setSelectedImages((prev) => [...prev, ...imageFiles]);
+    };
+
+    const removeImage = (indexToRemove) => {
+        setSelectedImages((prev) => prev.filter((_, index) => index !== indexToRemove));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setLoading(true);
         setError('');
-        
-        // Mock API call or use the real createBike endpoint if connected
+        setSuccessMessage('');
+        setLoading(true);
+
         try {
-            await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network request
-            navigate('/seller-dashboard');
+            const payload = {
+                title: formData.title.trim(),
+                description: formData.description.trim(),
+                price: Number(formData.price),
+                brandId: Number(formData.brandId),
+                categoryId: Number(formData.categoryId),
+                frameSize: formData.frameSize.trim(),
+                bikeCondition: formData.condition,
+            };
+
+            const createdBike = await createBikeListing(payload);
+            const bikeId = createdBike?.bikeId || createdBike?.id;
+
+            if (!bikeId) {
+                throw new Error('Bike ID was not returned from server.');
+            }
+
+            if (selectedImages.length > 0) {
+                await Promise.all(selectedImages.map((file) => uploadBikeImage(bikeId, file)));
+            }
+
+            setSuccessMessage('Your listing has been submitted and is waiting for admin approval.');
+            setSelectedImages([]);
+            setFormData({
+                title: '',
+                description: '',
+                price: '',
+                brandId: '',
+                categoryId: '',
+                frameSize: '',
+                condition: conditions[0] || 'Used',
+            });
         } catch (err) {
-            setError('Failed to create listing. Please try again.');
+            setError(
+                err.response?.data?.message ||
+                err.message ||
+                'Failed to create listing. Please try again.'
+            );
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 p-8">
-            <div className="max-w-3xl mx-auto">
-                {/* Back Button */}
-                <button 
+        <div className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
+            <div className="max-w-4xl mx-auto">
+                <Button
+                    type="button"
+                    variant="ghost"
                     onClick={() => navigate('/seller-dashboard')}
-                    className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors mb-6 cursor-pointer"
+                    className="mb-4 pl-0 text-gray-600 hover:text-gray-900"
                 >
                     <ArrowLeft className="w-4 h-4" />
                     Back to Dashboard
-                </button>
+                </Button>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden text-gray-800">
-                    <div className="px-8 py-6 border-b border-gray-100 bg-gray-50">
-                        <h1 className="text-2xl font-bold flex items-center gap-3">
-                            <span className="p-2 bg-primary/10 rounded-lg text-primary">
-                                <Bike className="w-6 h-6" />
+                <Card className="shadow-sm">
+                    <CardHeader className="border-b bg-white/70">
+                        <CardTitle className="text-2xl flex items-center gap-3">
+                            <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary">
+                                <Bike className="w-5 h-5" />
                             </span>
-                            Create New Listing
-                        </h1>
-                        <p className="text-sm text-gray-500 mt-2">
-                            Fill out the details below to list your bike. Admins will review the listing before it goes live.
+                            Seller Create Bike Listing
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                            Fill in bike details, create listing, then upload multiple images.
                         </p>
-                    </div>
+                    </CardHeader>
 
-                    <div className="p-8">
+                    <CardContent className="pt-6">
                         {error && (
-                            <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-700 text-sm flex items-start gap-3 border border-red-100">
-                                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500" />
-                                <div>
-                                    <h4 className="font-semibold">Error Submitting Listing</h4>
-                                    <p className="mt-1">{error}</p>
-                                </div>
+                            <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-start gap-2">
+                                <AlertCircle className="w-4 h-4 mt-0.5" />
+                                <span>{error}</span>
                             </div>
                         )}
 
-                        <form onSubmit={handleSubmit} className="space-y-8">
-                            {/* Section: Basic Info */}
-                            <div className="space-y-6">
-                                <h3 className="text-lg font-semibold border-b border-gray-100 pb-2">Basic Information</h3>
-                                
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="title" className="text-sm font-medium">Bike Title</Label>
-                                        <Input
-                                            id="title"
-                                            value={formData.title}
-                                            onChange={handleChange}
-                                            placeholder="e.g. 2023 Specialized Tarmac SL7"
-                                            required
-                                            className="h-11 border-gray-300 focus:border-primary focus:ring-primary shadow-sm"
-                                        />
-                                    </div>
+                        {successMessage && (
+                            <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700 flex items-start gap-2">
+                                <CheckCircle2 className="w-4 h-4 mt-0.5" />
+                                <span>{successMessage}</span>
+                            </div>
+                        )}
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="price" className="text-sm font-medium">Price ($)</Label>
-                                            <Input
-                                                id="price"
-                                                type="number"
-                                                min="0"
-                                                value={formData.price}
-                                                onChange={handleChange}
-                                                placeholder="0.00"
-                                                required
-                                                className="h-11 border-gray-300 focus:border-primary shadow-sm"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="condition" className="text-sm font-medium">Condition</Label>
-                                            <select
-                                                id="condition"
-                                                value={formData.condition}
-                                                onChange={handleChange}
-                                                className="flex h-11 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
-                                                required
-                                            >
-                                                <option value="New">New</option>
-                                                <option value="Like New">Like New</option>
-                                                <option value="Used">Used</option>
-                                                <option value="Needs Repair">Needs Repair</option>
-                                            </select>
-                                        </div>
-                                    </div>
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2 md:col-span-2">
+                                    <Label htmlFor="title">Title</Label>
+                                    <Input
+                                        id="title"
+                                        value={formData.title}
+                                        onChange={handleChange}
+                                        placeholder="e.g. 2023 Specialized Tarmac SL7"
+                                        required
+                                    />
+                                </div>
 
-                                    <div className="space-y-2">
-                                        <Label htmlFor="description" className="text-sm font-medium">Description</Label>
-                                        <textarea
-                                            id="description"
-                                            rows="4"
-                                            value={formData.description}
-                                            onChange={handleChange}
-                                            placeholder="Describe the bike's history, upgrades, flaws, and general condition..."
-                                            className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                                            required
-                                        ></textarea>
-                                    </div>
+                                <div className="space-y-2 md:col-span-2">
+                                    <Label htmlFor="description">Description</Label>
+                                    <Textarea
+                                        id="description"
+                                        rows={4}
+                                        value={formData.description}
+                                        onChange={handleChange}
+                                        placeholder="Describe bike condition, maintenance history, and highlights"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="price">Price</Label>
+                                    <Input
+                                        id="price"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={formData.price}
+                                        onChange={handleChange}
+                                        placeholder="0"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="frameSize">Frame Size</Label>
+                                    <Input
+                                        id="frameSize"
+                                        value={formData.frameSize}
+                                        onChange={handleChange}
+                                        placeholder="e.g. M / 54cm"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="brandId">Brand</Label>
+                                    <Select
+                                        id="brandId"
+                                        value={formData.brandId}
+                                        onChange={handleChange}
+                                        disabled={metaLoading || brands.length === 0}
+                                        required
+                                    >
+                                        <option value="" disabled>
+                                            {metaLoading ? 'Loading brands...' : 'Select brand'}
+                                        </option>
+                                        {brands.map((brand) => (
+                                            <option key={brand.brandId || brand.id} value={brand.brandId || brand.id}>
+                                                {brand.brandName || brand.name}
+                                            </option>
+                                        ))}
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="categoryId">Category</Label>
+                                    <Select
+                                        id="categoryId"
+                                        value={formData.categoryId}
+                                        onChange={handleChange}
+                                        disabled={metaLoading || categories.length === 0}
+                                        required
+                                    >
+                                        <option value="" disabled>
+                                            {metaLoading ? 'Loading categories...' : 'Select category'}
+                                        </option>
+                                        {categories.map((category) => (
+                                            <option key={category.categoryId || category.id} value={category.categoryId || category.id}>
+                                                {category.categoryName || category.name}
+                                            </option>
+                                        ))}
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-2 md:col-span-2">
+                                    <Label htmlFor="condition">Condition</Label>
+                                    <Select
+                                        id="condition"
+                                        value={formData.condition}
+                                        onChange={handleChange}
+                                        disabled={metaLoading || conditions.length === 0}
+                                        required
+                                    >
+                                        {conditions.map((condition) => (
+                                            <option key={condition} value={condition}>{condition}</option>
+                                        ))}
+                                    </Select>
                                 </div>
                             </div>
 
-                            {/* Section: Specifications */}
-                            <div className="space-y-6">
-                                <h3 className="text-lg font-semibold border-b border-gray-100 pb-2">Specifications</h3>
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="brandId" className="text-sm font-medium">Brand (ID)</Label>
-                                        <Input
-                                            id="brandId"
-                                            value={formData.brandId}
-                                            onChange={handleChange}
-                                            placeholder="Brand ID"
-                                            required
-                                            className="h-11 shadow-sm"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="categoryId" className="text-sm font-medium">Category (ID)</Label>
-                                        <Input
-                                            id="categoryId"
-                                            value={formData.categoryId}
-                                            onChange={handleChange}
-                                            placeholder="Category ID"
-                                            required
-                                            className="h-11 shadow-sm"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="frameSize" className="text-sm font-medium">Frame Size</Label>
-                                        <Input
-                                            id="frameSize"
-                                            value={formData.frameSize}
-                                            onChange={handleChange}
-                                            placeholder="e.g. M, L, 54cm, 56cm"
-                                            required
-                                            className="h-11 shadow-sm"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section: Photos */}
-                            <div className="space-y-6">
-                                <h3 className="text-lg font-semibold border-b border-gray-100 pb-2">Photos</h3>
-                                
-                                <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-xl p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-gray-100 transition-colors">
-                                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
-                                        <Upload className="w-8 h-8 text-primary" />
-                                    </div>
-                                    <h4 className="font-medium text-gray-900">Click to upload or drag & drop</h4>
-                                    <p className="text-sm text-gray-500 mt-1">
-                                        SVG, PNG, JPG or GIF (max. 800x400px)<br/>
-                                        First photo will be the cover image.
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Submit */}
-                            <div className="pt-6 border-t border-gray-100 flex justify-end gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => navigate('/seller-dashboard')}
-                                    className="px-6 py-2.5 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors cursor-pointer"
+                            <div className="space-y-3">
+                                <Label htmlFor="images">Bike Images</Label>
+                                <label
+                                    htmlFor="images"
+                                    className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center cursor-pointer hover:bg-gray-100 transition-colors"
                                 >
+                                    <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center mb-2 shadow-sm">
+                                        <Upload className="w-5 h-5 text-primary" />
+                                    </div>
+                                    <p className="text-sm font-medium text-gray-800">Click to select multiple images</p>
+                                    <p className="text-xs text-gray-500 mt-1">PNG, JPG, JPEG, WEBP</p>
+                                </label>
+                                <Input
+                                    id="images"
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    onChange={handleImagesChange}
+                                    className="hidden"
+                                />
+
+                                {previewUrls.length > 0 && (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                        {previewUrls.map((item, index) => (
+                                            <div key={`${item.file.name}-${index}`} className="relative rounded-lg overflow-hidden border bg-white">
+                                                <img
+                                                    src={item.url}
+                                                    alt={`preview-${index}`}
+                                                    className="h-28 w-full object-cover"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeImage(index)}
+                                                    className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 hover:bg-black/80"
+                                                    aria-label="Remove image"
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {previewUrls.length === 0 && (
+                                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                                        <ImageIcon className="w-4 h-4" />
+                                        No image selected yet.
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row sm:justify-end gap-2 pt-2">
+                                <Button type="button" variant="outline" onClick={() => navigate('/seller-dashboard')}>
                                     Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    className="px-6 py-2.5 rounded-lg bg-primary text-white font-medium hover:bg-primary/90 transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer shadow-md"
-                                >
+                                </Button>
+                                <Button type="submit" disabled={loading || metaLoading}>
                                     {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                                    {loading ? 'Submitting...' : 'Submit Listing'}
-                                </button>
+                                    {loading ? 'Creating Listing...' : 'Create Listing'}
+                                </Button>
                             </div>
                         </form>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );

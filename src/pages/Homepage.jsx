@@ -112,6 +112,26 @@ export default function Homepage() {
         setUser(null);
     };
 
+    const handlePostAdClick = () => {
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+
+        const role = user?.roleName?.toUpperCase();
+        if (role === 'SELLER') {
+            navigate('/seller/create-listing');
+            return;
+        }
+
+        if (role === 'BUYER') {
+            navigate('/seller-request');
+            return;
+        }
+
+        navigate('/');
+    };
+
     const isBuyer = user?.roleName?.toUpperCase() === 'BUYER';
 
     return (
@@ -221,6 +241,7 @@ export default function Homepage() {
                             )}
 
                             <Button
+                                onClick={handlePostAdClick}
                                 className="bg-white text-[#F56218] hover:bg-gray-100 border-0 rounded-full px-4 sm:px-6 h-10 font-bold flex items-center gap-2 shadow-sm"
                             >
                                 <span className="hidden sm:block">POST AD</span>
