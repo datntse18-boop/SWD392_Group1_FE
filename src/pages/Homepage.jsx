@@ -20,6 +20,7 @@ import {
     Wrench,
     Navigation,
     Store,
+    ClipboardCheck,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -56,7 +57,11 @@ export default function Homepage() {
         try {
             setLoading(true);
             const data = await getBikes(filters);
-            setBikes(data);
+            const visibleBikes = (Array.isArray(data) ? data : []).filter((bike) => {
+                const status = (bike?.status || bike?.bikeStatus || '').toUpperCase();
+                return status !== 'PENDING';
+            });
+            setBikes(visibleBikes);
         } catch (error) {
             console.error('Error fetching bikes:', error);
         } finally {
@@ -132,7 +137,47 @@ export default function Homepage() {
         navigate('/');
     };
 
+    const handleProfileClick = () => {
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+
+        const role = user?.roleName?.toUpperCase();
+        if (role === 'BUYER') navigate('/dashboard');
+        else if (role === 'SELLER') navigate('/seller-dashboard');
+        else if (role === 'INSPECTOR') navigate('/inspector-dashboard');
+        else if (role === 'ADMIN') navigate('/admin-dashboard');
+        else navigate('/');
+    };
+
+    const handleMyListingsClick = () => {
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+
+        const role = user?.roleName?.toUpperCase();
+        if (role === 'SELLER') {
+            navigate('/seller-dashboard');
+            return;
+        }
+
+        if (role === 'INSPECTOR') {
+            navigate('/inspector-dashboard');
+            return;
+        }
+
+        if (role === 'BUYER') {
+            navigate('/dashboard');
+            return;
+        }
+
+        navigate('/');
+    };
+
     const isBuyer = user?.roleName?.toUpperCase() === 'BUYER';
+    const isInspector = user?.roleName?.toUpperCase() === 'INSPECTOR';
 
     return (
         <div className="min-h-screen bg-gray-50 font-sans">
@@ -188,6 +233,16 @@ export default function Homepage() {
                                 </Button>
                             )}
 
+                            {isInspector && (
+                                <Button
+                                    onClick={() => navigate('/inspector-dashboard')}
+                                    className="hidden lg:flex items-center gap-2 bg-white text-[#F56218] hover:bg-gray-100 border-0 rounded-full px-4 h-9 text-sm font-semibold shadow-sm"
+                                >
+                                    <ClipboardCheck className="w-4 h-4" />
+                                    Inspection Manager
+                                </Button>
+                            )}
+
                             <div className="h-6 w-px bg-white/30 hidden lg:block mx-1"></div>
 
                             {user ? (
@@ -214,10 +269,16 @@ export default function Homepage() {
                                                 </p>
                                                 <p className="text-xs text-gray-500 truncate">{user.email}</p>
                                             </div>
-                                            <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">
+                                            <button
+                                                onClick={handleProfileClick}
+                                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                                            >
                                                 Profile Management
                                             </button>
-                                            <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors">
+                                            <button
+                                                onClick={handleMyListingsClick}
+                                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                                            >
                                                 My Listings
                                             </button>
                                             <div className="h-px bg-gray-100 my-1"></div>

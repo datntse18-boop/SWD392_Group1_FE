@@ -208,4 +208,40 @@ export const deleteBikeImage = async (bikeId, imageUrl) => {
     return response.data;
 };
 
+/**
+ * Seller requests inspection for a bike listing
+ * @param {number} bikeId
+ */
+export const requestBikeInspection = async (bikeId) => {
+    const response = await api.post(`/Bikes/${bikeId}/inspection-request`);
+    return response.data;
+};
+
+/**
+ * Inspector gets pending inspection requests
+ */
+export const getPendingInspectionRequests = async () => {
+    const response = await api.get('/InspectionReports/pending');
+    return response.data;
+};
+
+/**
+ * Get all inspection reports
+ */
+export const getInspectionReports = async () => {
+    const response = await api.get('/InspectionReports');
+    return response.data;
+};
+
+/**
+ * Inspector completes an inspection report
+ * @param {number} reportId
+ * @param {Object} payload
+ */
+export const completeInspectionReport = async (reportId, payload) => {
+    const response = await api.put(`/InspectionReports/${reportId}/complete`, payload);
+
+    return response.data;
+};
+
 export default api;

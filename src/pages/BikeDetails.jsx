@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getBikeById, uploadBikeImage, deleteBikeImage } from '@/services/api';
-import { ArrowLeft, User, MapPin, CheckCircle, Tag, ImagePlus, Loader2, Trash2 } from 'lucide-react';
+import { ArrowLeft, User, MapPin, CheckCircle, Tag, ImagePlus, Loader2, Trash2, AlertTriangle, ShieldCheck, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function BikeDetails() {
@@ -86,6 +86,27 @@ export default function BikeDetails() {
     };
 
     const isOwner = user && bike && user.userId === bike.sellerId;
+    const bikeStatus = (bike?.status || bike?.bikeStatus || '').toUpperCase();
+    const inspectionStatus = (bike?.inspectionStatus || bike?.InspectionStatus || '').toUpperCase();
+    const isInspected = bike?.isInspected ?? bike?.IsInspected ?? false;
+    const inspectionWarning = bike?.inspectionWarning || bike?.InspectionWarning || '';
+    const inspectionReports = bike?.inspectionReports || bike?.InspectionReports || [];
+    const latestInspection = Array.isArray(inspectionReports) && inspectionReports.length > 0
+        ? inspectionReports[0]
+        : null;
+    const latestInspectionStatus = (latestInspection?.inspectionStatus || latestInspection?.status || '').toUpperCase();
+    const latestResult = latestInspection?.result
+        || (latestInspectionStatus === 'APPROVED' ? 'Passed' : latestInspectionStatus === 'REJECTED' ? 'Failed' : null);
+    const latestNotes = latestInspection?.inspectorNotes || latestInspection?.overallComment || null;
+    const latestReportFile = latestInspection?.reportFileUrl || latestInspection?.reportFile || null;
+    const latestFrame = latestInspection?.frameCondition || null;
+    const latestBrake = latestInspection?.brakeCondition || null;
+    const latestDrivetrain = latestInspection?.drivetrainCondition || null;
+
+    const isApprovedListing = bikeStatus === 'APPROVED';
+    const isInspectionPassed = inspectionStatus === 'APPROVED' || inspectionStatus === 'PASSED';
+    const showInspectionWarning = isApprovedListing && !isInspected;
+    const showInspectionPassed = isInspectionPassed;
 
     if (loading) {
         return (
@@ -232,6 +253,78 @@ export default function BikeDetails() {
                                 </span>
                             )}
                         </div>
+
+                        {(showInspectionWarning || showInspectionPassed) && (
+                            <div
+                                className={`mb-6 rounded-xl border px-4 py-3 flex items-start gap-3 ${
+                                    showInspectionPassed
+                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                                        : 'bg-amber-50 border-amber-200 text-amber-800'
+                                }`}
+                            >
+                                {showInspectionPassed ? (
+                                    <ShieldCheck className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                                ) : (
+                                    <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                                )}
+                                <div>
+                                    <p className="font-semibold text-sm">
+                                        {showInspectionPassed
+                                            ? '✔ Sản phẩm đã được kiểm định'
+                                            : '⚠ Sản phẩm chưa được kiểm duyệt bởi Inspector'}
+                                    </p>
+                                    {!showInspectionPassed && inspectionWarning && (
+                                        <p className="text-xs mt-1 opacity-90">{inspectionWarning}</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {inspectionReports.length > 0 && (
+                            <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                <div className="flex items-center gap-2 text-gray-800 font-semibold mb-3">
+                                    <FileText className="w-4 h-4" />
+                                    Inspection Report
+                                </div>
+                                <div className="space-y-2 text-sm text-gray-700">
+                                    {latestResult && (
+                                        <p>
+                                            <span className="font-medium">Result:</span> {latestResult}
+                                        </p>
+                                    )}
+                                    {latestFrame && (
+                                        <p>
+                                            <span className="font-medium">Frame:</span> {latestFrame}
+                                        </p>
+                                    )}
+                                    {latestBrake && (
+                                        <p>
+                                            <span className="font-medium">Brakes:</span> {latestBrake}
+                                        </p>
+                                    )}
+                                    {latestDrivetrain && (
+                                        <p>
+                                            <span className="font-medium">Drivetrain:</span> {latestDrivetrain}
+                                        </p>
+                                    )}
+                                    {latestNotes && (
+                                        <p className="whitespace-pre-wrap">
+                                            <span className="font-medium">Inspector Notes:</span> {latestNotes}
+                                        </p>
+                                    )}
+                                    {latestReportFile && (
+                                        <a
+                                            href={latestReportFile}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex items-center text-primary hover:underline font-medium"
+                                        >
+                                            View inspection file
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="bg-gray-50 rounded-xl p-5 mb-8 border border-gray-100 space-y-4">
