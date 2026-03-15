@@ -176,6 +176,21 @@ export default function Homepage() {
         navigate('/');
     };
 
+    const handleChatClick = () => {
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+
+        const role = user?.roleName?.toUpperCase();
+        if (role === 'BUYER' || role === 'SELLER') {
+            navigate('/chat');
+            return;
+        }
+
+        navigate('/');
+    };
+
     const isBuyer = user?.roleName?.toUpperCase() === 'BUYER';
     const isInspector = user?.roleName?.toUpperCase() === 'INSPECTOR';
 
@@ -218,7 +233,7 @@ export default function Homepage() {
                             <button className="hidden sm:flex items-center gap-1.5 p-2 text-white hover:bg-white/20 rounded-full transition-colors">
                                 <Bell className="w-5 h-5" />
                             </button>
-                            <button className="hidden lg:flex items-center gap-1.5 p-2 text-white hover:bg-white/20 rounded-full transition-colors">
+                            <button onClick={handleChatClick} className="hidden lg:flex items-center gap-1.5 p-2 text-white hover:bg-white/20 rounded-full transition-colors">
                                 <MessageCircle className="w-5 h-5" />
                                 <span className="text-sm font-medium">Chat</span>
                             </button>

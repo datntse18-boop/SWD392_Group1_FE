@@ -108,6 +108,24 @@ export default function BikeDetails() {
     const showInspectionWarning = isApprovedListing && !isInspected;
     const showInspectionPassed = isInspectionPassed;
 
+    const handleChatWithSeller = () => {
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+
+        if (!bike?.sellerId || user.userId === bike.sellerId) {
+            return;
+        }
+
+        navigate(`/chat?sellerId=${bike.sellerId}&bikeId=${bike.bikeId}`, {
+            state: {
+                sellerName: bike.sellerName,
+                bikeTitle: bike.title,
+            },
+        });
+    };
+
     if (loading) {
         return (
             <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[50vh]">
@@ -342,8 +360,12 @@ export default function BikeDetails() {
                             </div>
                         </div>
                         <div className="flex gap-3 mt-4">
-                            <button className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 px-4 rounded-lg transition-colors border border-gray-200">
-                                Contact Seller
+                            <button
+                                onClick={handleChatWithSeller}
+                                disabled={user?.userId === bike.sellerId}
+                                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 px-4 rounded-lg transition-colors border border-gray-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                Chat with Seller
                             </button>
                             <button 
                                 onClick={() => navigate(`/checkout/${bike.bikeId}`)}

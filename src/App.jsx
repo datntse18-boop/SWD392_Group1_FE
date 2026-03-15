@@ -13,6 +13,7 @@ import InspectorDashboard from '@/pages/InspectorDashboard';
 import InspectionForm from '@/pages/InspectionForm';
 import Checkout from '@/pages/Checkout';
 import SellerRequest from '@/pages/SellerRequest';
+import Chat from '@/pages/Chat';
 
 function App() {
   return (
@@ -35,6 +36,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['BUYER']}>
               <BuyerDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/chat"
+          element={
+            <ProtectedRoute allowedRoles={['BUYER', 'SELLER']}>
+              <Chat />
             </ProtectedRoute>
           }
         />

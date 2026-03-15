@@ -175,7 +175,11 @@ export default function SellerDashboard() {
                                             const bikeStatus = normalizeUpper(bike.status || bike.bikeStatus);
                                             const inspectionStatus = normalizeUpper(bike.inspectionStatus || bike.InspectionStatus);
                                             const isInspected = bike.isInspected ?? bike.IsInspected ?? false;
-                                            const canRequestInspection = bikeStatus === 'APPROVED' && !isInspected && inspectionStatus !== 'PENDING';
+                                            const isInspectionFailed = inspectionStatus === 'REJECTED' || inspectionStatus === 'FAILED';
+                                            const canRequestInspection =
+                                                bikeStatus === 'APPROVED'
+                                                && inspectionStatus !== 'PENDING'
+                                                && (!isInspected || isInspectionFailed);
                                             const isInspectionPending = inspectionStatus === 'PENDING';
 
                                             return (
@@ -189,6 +193,11 @@ export default function SellerDashboard() {
                                                             <p className="text-sm text-gray-500">
                                                                 Inspection: <span className="font-medium">{bike.inspectionStatus || 'NOT_REQUESTED'}</span>
                                                             </p>
+                                                            {isInspectionFailed && (
+                                                                <p className="mt-2 inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
+                                                                    Yêu cầu kiểm định trước đó đã FAILED. Vui lòng gửi lại yêu cầu.
+                                                                </p>
+                                                            )}
                                                         </div>
 
                                                         <div className="flex items-center gap-2">
@@ -196,14 +205,18 @@ export default function SellerDashboard() {
                                                                 <button
                                                                     onClick={() => handleRequestInspection(bike.bikeId)}
                                                                     disabled={requestLoadingId === bike.bikeId}
-                                                                    className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-70 cursor-pointer"
+                                                                    className={`inline-flex items-center gap-2 px-4 py-2 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-70 cursor-pointer ${
+                                                                        isInspectionFailed
+                                                                            ? 'bg-yellow-500 hover:bg-yellow-600'
+                                                                            : 'bg-amber-600 hover:bg-amber-700'
+                                                                    }`}
                                                                 >
                                                                     {requestLoadingId === bike.bikeId ? (
                                                                         <Loader2 className="w-4 h-4 animate-spin" />
                                                                     ) : (
                                                                         <ShieldAlert className="w-4 h-4" />
                                                                     )}
-                                                                    Request Inspection
+                                                                    {isInspectionFailed ? 'Resend Request' : 'Request Inspection'}
                                                                 </button>
                                                             )}
 

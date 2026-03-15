@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ClipboardCheck, LogOut, Loader2, CheckCircle2, Eye } from 'lucide-react';
-import { getPendingInspectionRequests, getInspectionReports } from '@/services/api';
+import { getPendingInspectionRequests, getInspectionReports, getBikeById } from '@/services/api';
 
 const menuItems = [
     { key: 'inspections', label: 'Pending Inspections', icon: <ClipboardCheck className="w-5 h-5" /> },
@@ -23,7 +23,7 @@ export default function InspectorDashboard() {
         title: item.bikeTitle || item.title || item.bike?.title || 'Untitled Bike',
         seller: item.sellerName || item.seller?.fullName || item.bike?.sellerName || 'Unknown Seller',
         price: item.price || item.bike?.price || 0,
-        date: item.requestedAt || item.createdAt || item.inspectionDate || item.date,
+        date: item.requestedAt || item.createdAt || item.inspectedAt || item.inspectionDate || item.date,
     });
 
     const mapInspectionReport = (item) => ({
@@ -42,7 +42,31 @@ export default function InspectorDashboard() {
         try {
             const data = await getPendingInspectionRequests();
             const mapped = (Array.isArray(data) ? data : []).map(mapPendingRequest);
-            setPendingRequests(mapped);
+
+            const enriched = await Promise.all(
+                mapped.map(async (item) => {
+                    if (item.seller && item.seller !== 'Unknown Seller') {
+                        return item;
+                    }
+
+                    if (!item.bikeId) {
+                        return item;
+                    }
+
+                    try {
+                        const bike = await getBikeById(item.bikeId);
+                        return {
+                            ...item,
+                            seller: bike?.sellerName || bike?.seller?.fullName || item.seller,
+                            date: item.date || bike?.createdAt || bike?.updatedAt || null,
+                        };
+                    } catch {
+                        return item;
+                    }
+                })
+            );
+
+            setPendingRequests(enriched);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to load pending inspections.');
         } finally {

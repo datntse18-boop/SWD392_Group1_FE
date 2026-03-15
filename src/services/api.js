@@ -244,4 +244,39 @@ export const completeInspectionReport = async (reportId, payload) => {
     return response.data;
 };
 
+/**
+ * Send a chat message
+ * @param {Object} payload
+ */
+export const sendMessage = async (payload) => {
+    const response = await api.post('/Messages', payload);
+    return response.data;
+};
+
+/**
+ * Get conversation between two users
+ * @param {number} user1Id
+ * @param {number} user2Id
+ * @param {number | null} bikeId
+ */
+export const getConversationMessages = async (user1Id, user2Id, bikeId = null) => {
+    const response = await api.get('/Messages/conversation', {
+        params: {
+            user1Id,
+            user2Id,
+            ...(bikeId ? { bikeId } : {}),
+        },
+    });
+    return response.data;
+};
+
+/**
+ * Get inbox summary for a user
+ * @param {number} userId
+ */
+export const getMessageInbox = async (userId) => {
+    const response = await api.get(`/Messages/inbox/${userId}`);
+    return response.data;
+};
+
 export default api;
