@@ -1,4 +1,6 @@
-import api from './api';
+import api, { updateUserRole } from './api';
+
+export { updateUserRole };
 
 // ===== FR-13: Admin — Bike Listings =====
 
