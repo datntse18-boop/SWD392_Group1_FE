@@ -130,4 +130,16 @@ export const uploadBikeImage = async (bikeId, file) => {
     return response.data;
 };
 
+/**
+ * Delete bike image by URL via Backend
+ * @param {number} bikeId 
+ * @param {string} imageUrl 
+ */
+export const deleteBikeImage = async (bikeId, imageUrl) => {
+    const response = await api.delete(`/Bikes/${bikeId}/images`, {
+        params: { imageUrl }
+    });
+    return response.data;
+};
+
 export default api;

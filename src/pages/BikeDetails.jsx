@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getBikeById, uploadBikeImage } from '@/services/api';
-import { ArrowLeft, User, MapPin, CheckCircle, Tag, ImagePlus, Loader2 } from 'lucide-react';
+import { getBikeById, uploadBikeImage, deleteBikeImage } from '@/services/api';
+import { ArrowLeft, User, MapPin, CheckCircle, Tag, ImagePlus, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function BikeDetails() {
@@ -55,6 +55,31 @@ export default function BikeDetails() {
             console.error("Upload failed:", err);
             const errorMsg = err.response?.data?.message || err.response?.data || err.message || "Failed to upload image. Please try again.";
             alert(`Upload failed: ${errorMsg}`);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleDeleteImage = async (imageUrl, index, e) => {
+        e.stopPropagation(); // prevent clicking thumbnail
+        if (!window.confirm("Are you sure you want to delete this image?")) return;
+
+        try {
+            setIsUploading(true);
+            await deleteBikeImage(id, imageUrl);
+            
+            // Adjust selected index if needed
+            if (index === selectedImageIndex) {
+                 setSelectedImageIndex(0);
+            } else if (index < selectedImageIndex) {
+                 setSelectedImageIndex(prev => prev - 1);
+            }
+
+            await fetchBikeDetails();
+        } catch (err) {
+            console.error("Delete failed:", err);
+            const errorMsg = err.response?.data?.message || err.response?.data || err.message || "Failed to delete image.";
+            alert(`Delete failed: ${errorMsg}`);
         } finally {
             setIsUploading(false);
         }
@@ -130,9 +155,22 @@ export default function BikeDetails() {
                             <div
                                 key={index}
                                 onClick={() => setSelectedImageIndex(index)}
-                                className={`w-20 sm:w-24 aspect-square rounded-lg overflow-hidden border-2 transition-all cursor-pointer hover:opacity-100 ${selectedImageIndex === index ? 'border-[#F56218] shadow-md opacity-100 scale-105' : 'border-gray-200 opacity-70'}`}
+                                className={`relative w-20 sm:w-24 aspect-square rounded-lg overflow-hidden border-2 transition-all cursor-pointer hover:opacity-100 group/thumb ${selectedImageIndex === index ? 'border-[#F56218] shadow-md opacity-100 scale-105' : 'border-gray-200 opacity-70'}`}
                             >
                                 <img src={url} alt={`${bike.title} thumbnail ${index + 1}`} className="w-full h-full object-cover" />
+                                
+                                {/* Delete Overlay */}
+                                {isOwner && (
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
+                                         <button 
+                                            onClick={(e) => handleDeleteImage(url, index, e)}
+                                            className="p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors shadow-sm"
+                                            title="Delete Image"
+                                         >
+                                            <Trash2 className="w-4 h-4" />
+                                         </button>
+                                    </div>
+                                )}
                             </div>
                         ))}
 
