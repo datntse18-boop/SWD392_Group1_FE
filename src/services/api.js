@@ -202,7 +202,43 @@ export const createOrder = async (payload) => {
  * @param {number} orderId
  */
 export const confirmOrderReceived = async (orderId) => {
-    const response = await api.put(`/Orders/${orderId}/received`);
+    const response = await api.put(`/Orders/confirm-received/${orderId}`);
+    return response.data;
+};
+
+/**
+ * Create a review for seller after order is received
+ * @param {Object} payload
+ */
+export const createReview = async (payload) => {
+    const response = await api.post('/Reviews', payload);
+    return response.data;
+};
+
+/**
+ * Get all reviews
+ */
+export const getReviews = async () => {
+    const response = await api.get('/Reviews');
+    return response.data;
+};
+
+/**
+ * Update a review
+ * @param {number} reviewId
+ * @param {Object} payload
+ */
+export const updateReview = async (reviewId, payload) => {
+    const response = await api.put(`/Reviews/${reviewId}`, payload);
+    return response.data;
+};
+
+/**
+ * Delete a review
+ * @param {number} reviewId
+ */
+export const deleteReview = async (reviewId) => {
+    const response = await api.delete(`/Reviews/${reviewId}`);
     return response.data;
 };
 
