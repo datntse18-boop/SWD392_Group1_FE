@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'http://localhost:5026/api',
+    baseURL: 'https://localhost:7271/api',
     headers: {
         'Content-Type': 'application/json',
     },
@@ -44,6 +44,15 @@ export const loginUser = async (email, password) => {
 };
 
 /**
+ * Register a new user (defaults to Buyer)
+ * @param {Object} userData 
+ */
+export const registerUser = async (userData) => {
+    const response = await api.post('/Auth/register', userData);
+    return response.data;
+};
+
+/**
  * Get all users
  */
 export const getAllUsers = async () => {
@@ -77,6 +86,25 @@ export const createUser = async (userData) => {
 export const updateUser = async (id, userData) => {
     const response = await api.put(`/Users/${id}`, userData);
     return response.data;
+};
+
+/**
+ * Update user role (Admin only)
+ * @param {number} id 
+ * @param {number} roleId 
+ */
+export const updateUserRole = async (id, roleId) => {
+    const response = await api.put(`/Users/${id}/role`, { roleId });
+    return response;
+};
+
+/**
+ * Buyer requests to become a Seller
+ * @param {number} id 
+ */
+export const requestSellerRole = async (id) => {
+    const response = await api.post(`/Users/${id}/request-seller`);
+    return response;
 };
 
 /**

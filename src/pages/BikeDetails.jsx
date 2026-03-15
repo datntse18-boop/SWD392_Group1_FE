@@ -133,9 +133,17 @@ export default function BikeDetails() {
                                 </p>
                             </div>
                         </div>
-                        <button className="w-full mt-4 bg-[#F56218] hover:bg-[#D94E0A] text-white font-bold py-3 px-4 rounded-lg transition-colors">
-                            Contact Seller
-                        </button>
+                        <div className="flex gap-3 mt-4">
+                            <button className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 px-4 rounded-lg transition-colors border border-gray-200">
+                                Contact Seller
+                            </button>
+                            <button 
+                                onClick={() => navigate(`/checkout/${bike.bikeId}`)}
+                                className="flex-1 bg-[#F56218] hover:bg-[#D94E0A] text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-sm"
+                            >
+                                Buy Now
+                            </button>
+                        </div>
                     </div>
 
                     <div className="mt-2 text-gray-700">

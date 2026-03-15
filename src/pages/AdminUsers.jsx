@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getAllUsers } from '@/services/api';
-import { banUser, unbanUser } from '@/services/adminApi';
+import { banUser, unbanUser, updateUserRole } from '@/services/adminApi';
 
 const statusColors = {
     ACTIVE: 'bg-green-500/20 text-green-400 border-green-500/30',
@@ -55,9 +55,26 @@ export default function AdminUsers() {
         }
     };
 
-    const filteredUsers = filter === 'ALL' ? users : users.filter(u => u.status === filter);
+    const handleApproveSeller = async (id) => {
+        if (!window.confirm('Are you sure you want to approve this user as a SELLER?')) return;
+        try {
+            setActionLoading(id);
+            // Assuming roleId 3 is SELLER, you may need to adjust if different
+            await updateUserRole(id, 3);
+            await fetchUsers();
+        } catch (err) {
+            alert('Error approving seller: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setActionLoading(null);
+        }
+    };
 
-    const filters = ['ALL', 'ACTIVE', 'BANNED'];
+    const filteredUsers = filter === 'ALL' ? users : users.filter(u => {
+        if (filter === 'PENDING_SELLER') return u.pendingSellerUpgrade === true;
+        return u.status === filter;
+    });
+
+    const filters = ['ALL', 'ACTIVE', 'BANNED', 'PENDING_SELLER'];
 
     return (
         <div>
@@ -82,10 +99,12 @@ export default function AdminUsers() {
                             : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
                             }`}
                     >
-                        {f === 'ALL' ? 'All' : f}
+                        {f === 'PENDING_SELLER' ? 'Requests Seller' : (f === 'ALL' ? 'All' : f)}
                         {f !== 'ALL' && (
                             <span className="ml-1.5 text-xs opacity-70">
-                                ({users.filter(u => u.status === f).length})
+                                ({f === 'PENDING_SELLER' 
+                                    ? users.filter(u => u.pendingSellerUpgrade).length 
+                                    : users.filter(u => u.status === f).length})
                             </span>
                         )}
                     </button>
@@ -140,22 +159,35 @@ export default function AdminUsers() {
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         {user.roleName !== 'ADMIN' && (
-                                            <div className="flex gap-2 justify-end">
-                                                {user.status === 'ACTIVE' ? (
+                                            <div className="flex flex-col gap-2 items-end">
+                                                <div className="flex gap-2">
+                                                    {user.status === 'ACTIVE' ? (
+                                                        <button
+                                                            onClick={() => handleBan(user.userId)}
+                                                            disabled={actionLoading === user.userId}
+                                                            className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                                                        >
+                                                            {actionLoading === user.userId ? '...' : '🔒 Ban'}
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleUnban(user.userId)}
+                                                            disabled={actionLoading === user.userId}
+                                                            className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                                                        >
+                                                            {actionLoading === user.userId ? '...' : '🔓 Unban'}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                
+                                                {user.pendingSellerUpgrade && user.roleName === 'BUYER' && (
                                                     <button
-                                                        onClick={() => handleBan(user.userId)}
+                                                        onClick={() => handleApproveSeller(user.userId)}
                                                         disabled={actionLoading === user.userId}
-                                                        className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                                                        className="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1 cursor-pointer w-fit"
+                                                        title="Approve Seller Request"
                                                     >
-                                                        {actionLoading === user.userId ? '...' : '🔒 Ban'}
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => handleUnban(user.userId)}
-                                                        disabled={actionLoading === user.userId}
-                                                        className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
-                                                    >
-                                                        {actionLoading === user.userId ? '...' : '🔓 Unban'}
+                                                        {actionLoading === user.userId ? '...' : '⭐ Approve Seller'}
                                                     </button>
                                                 )}
                                             </div>
