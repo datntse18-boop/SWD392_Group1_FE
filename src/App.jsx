@@ -4,6 +4,7 @@ import Dashboard from '@/pages/Dashboard';
 import Homepage from '@/pages/Homepage';
 import BikeDetails from '@/pages/BikeDetails';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import AdminDashboard from '@/pages/AdminDashboard';
 
 function App() {
   return (
@@ -17,6 +18,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin-dashboard"
+          element={
+            <ProtectedRoute>
+              <AdminDashboard />
             </ProtectedRoute>
           }
         />

@@ -11,7 +11,7 @@ export default function ProtectedRoute({ children }) {
     try {
         const decoded = jwtDecode(token);
         const role = decoded['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'];
-        if (role !== 'Admin') {
+        if (role?.toUpperCase() !== 'ADMIN') {
             return <Navigate to="/" replace />;
         }
     } catch (err) {
