@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminListings from './AdminListings';
 import AdminUsers from './AdminUsers';
+import AdminReportManager from './AdminReportManager';
 import { Bike } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getUserById } from '@/services/api';
@@ -9,6 +10,7 @@ import { getUserById } from '@/services/api';
 const menuItems = [
     { key: 'profile', label: 'My Profile', icon: '🙍' },
     { key: 'listings', label: 'Ad posting management', icon: '🏍️' },
+    { key: 'reports', label: 'Report Manager', icon: '🚨' },
     { key: 'users', label: 'User management', icon: '👥' },
 ];
 
@@ -127,6 +129,7 @@ export default function AdminDashboard() {
                     </div>
 
                     {activeTab === 'listings' && <AdminListings />}
+                    {activeTab === 'reports' && <AdminReportManager />}
                     {activeTab === 'users' && <AdminUsers />}
                     {activeTab === 'profile' && (
                         <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm max-w-3xl">

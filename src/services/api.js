@@ -243,6 +243,68 @@ export const deleteReview = async (reviewId) => {
 };
 
 /**
+ * Create bike report (supports evidence image upload)
+ * @param {FormData} formData
+ */
+export const createBikeReport = async (formData) => {
+    const response = await api.post('/Reports', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
+    return response.data;
+};
+
+/**
+ * Admin gets all reports
+ */
+export const getAllReports = async () => {
+    const response = await api.get('/Reports');
+    return response.data;
+};
+
+/**
+ * Buyer gets own reports
+ */
+export const getMyReports = async () => {
+    const response = await api.get('/Reports/my-reports');
+    return response.data;
+};
+
+/**
+ * Admin updates report status
+ * @param {number} reportId
+ * @param {string} status
+ */
+export const updateReportStatus = async (reportId, status) => {
+    const response = await api.patch(`/Reports/${reportId}`, { status });
+    return response.data;
+};
+
+/**
+ * Buyer updates own pending report
+ * @param {number} reportId
+ * @param {FormData} formData
+ */
+export const updateMyPendingReport = async (reportId, formData) => {
+    const response = await api.put(`/Reports/${reportId}/my-report`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
+    return response.data;
+};
+
+/**
+ * Buyer deletes own pending report
+ * @param {number} reportId
+ */
+export const deleteMyPendingReport = async (reportId) => {
+    const response = await api.delete(`/Reports/${reportId}/my-report`);
+    return response.data;
+};
+
+/**
  * Fake payment confirm callback (VietQR demo)
  * @param {number} orderId
  */

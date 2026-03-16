@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, Heart, Store, LogOut, CheckCircle, AlertCircle, Loader2, PackageCheck, UserCircle2, Star } from 'lucide-react';
-import { confirmOrderReceived, createReview, deleteReview, getBikeById, getOrders, getReviews, getUserById, requestSellerRole, updateReview } from '@/services/api';
+import { confirmOrderReceived, createBikeReport, createReview, deleteMyPendingReport, deleteReview, getBikeById, getMyReports, getOrders, getReviews, getUserById, requestSellerRole, updateMyPendingReport, updateReview } from '@/services/api';
 
 const menuItems = [
     { key: 'profile', label: 'My Profile', icon: <UserCircle2 className="w-5 h-5" /> },
     { key: 'orders', label: 'My Orders', icon: <ShoppingBag className="w-5 h-5" /> },
     { key: 'reviewHistory', label: 'Review History', icon: <Star className="w-5 h-5" /> },
+    { key: 'reportHistory', label: 'Report History', icon: <AlertCircle className="w-5 h-5" /> },
     { key: 'wishlist', label: 'Wishlist', icon: <Heart className="w-5 h-5" /> },
 ];
 
@@ -41,6 +42,27 @@ export default function BuyerDashboard() {
     const [reviewHistoryBikeDetailsById, setReviewHistoryBikeDetailsById] = useState({});
     const [showConfirmReceiveModal, setShowConfirmReceiveModal] = useState(false);
     const [selectedReceiveOrder, setSelectedReceiveOrder] = useState(null);
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [reportOrder, setReportOrder] = useState(null);
+    const [reportReason, setReportReason] = useState('');
+    const [reportFiles, setReportFiles] = useState([]);
+    const [reportFilePreviews, setReportFilePreviews] = useState([]);
+    const [reportSubmitting, setReportSubmitting] = useState(false);
+    const [reportError, setReportError] = useState('');
+    const [reportSuccess, setReportSuccess] = useState(false);
+    const [myReports, setMyReports] = useState([]);
+    const [myReportsLoading, setMyReportsLoading] = useState(false);
+    const [myReportsError, setMyReportsError] = useState('');
+    const [myReportsMessage, setMyReportsMessage] = useState('');
+    const [myReportsActionLoadingId, setMyReportsActionLoadingId] = useState(null);
+    const [showEditReportModal, setShowEditReportModal] = useState(false);
+    const [editingReport, setEditingReport] = useState(null);
+    const [editReportReason, setEditReportReason] = useState('');
+    const [editReportExistingImageUrls, setEditReportExistingImageUrls] = useState([]);
+    const [editReportNewFiles, setEditReportNewFiles] = useState([]);
+    const [editReportNewPreviews, setEditReportNewPreviews] = useState([]);
+    const [editReportError, setEditReportError] = useState('');
+    const [editReportSubmitting, setEditReportSubmitting] = useState(false);
     const navigate = useNavigate();
 
     const loadOrders = async (buyerId) => {
@@ -76,6 +98,22 @@ export default function BuyerDashboard() {
         }
     };
 
+    const loadMyReports = async (buyerId) => {
+        try {
+            setMyReportsLoading(true);
+            setMyReportsError('');
+            const data = await getMyReports();
+            const reports = (Array.isArray(data) ? data : [])
+                .filter((report) => Number(report.reporterId) === Number(buyerId))
+                .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+            setMyReports(reports);
+        } catch (err) {
+            setMyReportsError(err.response?.data?.message || 'Failed to load your reports.');
+        } finally {
+            setMyReportsLoading(false);
+        }
+    };
+
     useEffect(() => {
         const initUser = async () => {
             const userDataString = localStorage.getItem('user');
@@ -90,10 +128,12 @@ export default function BuyerDashboard() {
                 localStorage.setItem('user', JSON.stringify(mergedUser));
                 loadOrders(mergedUser.userId);
                 loadMyReviews(mergedUser.userId);
+                loadMyReports(mergedUser.userId);
             } catch {
                 setUser(parsedUser);
                 loadOrders(parsedUser.userId);
                 loadMyReviews(parsedUser.userId);
+                loadMyReports(parsedUser.userId);
             }
         };
 
@@ -341,6 +381,207 @@ export default function BuyerDashboard() {
         }
     };
 
+    const handleOpenReportModal = (order) => {
+        setReportOrder(order);
+        setReportReason('');
+        setReportFiles([]);
+        setReportFilePreviews([]);
+        setReportError('');
+        setReportSuccess(false);
+        setShowReportModal(true);
+    };
+
+    const handleCloseReportModal = () => {
+        if (reportSubmitting) return;
+        setShowReportModal(false);
+        setReportOrder(null);
+        setReportReason('');
+        setReportFiles([]);
+        setReportFilePreviews([]);
+        setReportError('');
+        setReportSuccess(false);
+    };
+
+    const handleReportFileChange = (e) => {
+        const pickedFiles = Array.from(e.target.files || []);
+        if (!pickedFiles.length) return;
+
+        const validFiles = pickedFiles.filter((file) => /image\/(jpeg|jpg|png)/i.test(file.type));
+        if (validFiles.length !== pickedFiles.length) {
+            setReportError('Only jpg, jpeg, png files are allowed.');
+        } else {
+            setReportError('');
+        }
+
+        const mergedFiles = [...reportFiles, ...validFiles].slice(0, 5);
+        const mergedPreviews = mergedFiles.map((file) => URL.createObjectURL(file));
+
+        reportFilePreviews.forEach((url) => URL.revokeObjectURL(url));
+
+        setReportFiles(mergedFiles);
+        setReportFilePreviews(mergedPreviews);
+
+        if (mergedFiles.length >= 5) {
+            setReportError('Maximum 5 images allowed.');
+        }
+    };
+
+    const handleRemoveReportFile = (indexToRemove) => {
+        const nextFiles = reportFiles.filter((_, index) => index !== indexToRemove);
+        reportFilePreviews.forEach((url) => URL.revokeObjectURL(url));
+        const nextPreviews = nextFiles.map((file) => URL.createObjectURL(file));
+        setReportFiles(nextFiles);
+        setReportFilePreviews(nextPreviews);
+        setReportError('');
+    };
+
+    const handleSubmitReport = async () => {
+        if (!reportOrder || !user?.userId) return;
+
+        if (!reportReason.trim()) {
+            setReportError('Reason is required.');
+            return;
+        }
+
+        try {
+            setReportSubmitting(true);
+            setReportError('');
+
+            const formData = new FormData();
+            formData.append('reporterId', String(user.userId));
+            formData.append('bikeId', String(reportOrder.bikeId));
+            formData.append('reason', reportReason.trim());
+
+            reportFiles.forEach((file) => {
+                formData.append('evidenceImages', file);
+            });
+
+            await createBikeReport(formData);
+            setReportSuccess(true);
+            setOrdersSuccess('Report submitted successfully. Admin will review your report.');
+            await loadMyReports(user.userId);
+        } catch (err) {
+            setReportError(err.response?.data?.message || 'Failed to submit report.');
+        } finally {
+            setReportSubmitting(false);
+        }
+    };
+
+    const handleOpenEditReportModal = (report) => {
+        setEditingReport(report);
+        setEditReportReason(report.reason || '');
+        setEditReportExistingImageUrls(Array.isArray(report.imageUrls) ? [...report.imageUrls] : []);
+        setEditReportNewFiles([]);
+        setEditReportNewPreviews([]);
+        setEditReportError('');
+        setShowEditReportModal(true);
+    };
+
+    const handleCloseEditReportModal = () => {
+        if (editReportSubmitting) return;
+        editReportNewPreviews.forEach((url) => URL.revokeObjectURL(url));
+        setShowEditReportModal(false);
+        setEditingReport(null);
+        setEditReportReason('');
+        setEditReportExistingImageUrls([]);
+        setEditReportNewFiles([]);
+        setEditReportNewPreviews([]);
+        setEditReportError('');
+    };
+
+    const handleEditReportFileChange = (e) => {
+        const pickedFiles = Array.from(e.target.files || []);
+        if (!pickedFiles.length) return;
+
+        const validFiles = pickedFiles.filter((file) => /image\/(jpeg|jpg|png)/i.test(file.type));
+        if (validFiles.length !== pickedFiles.length) {
+            setEditReportError('Only jpg, jpeg, png files are allowed.');
+        } else {
+            setEditReportError('');
+        }
+
+        const existingCount = editReportExistingImageUrls.length;
+        const currentNewFiles = [...editReportNewFiles, ...validFiles];
+        const allowedNewCount = Math.max(0, 5 - existingCount);
+        const nextNewFiles = currentNewFiles.slice(0, allowedNewCount);
+
+        editReportNewPreviews.forEach((url) => URL.revokeObjectURL(url));
+        const nextPreviews = nextNewFiles.map((file) => URL.createObjectURL(file));
+
+        setEditReportNewFiles(nextNewFiles);
+        setEditReportNewPreviews(nextPreviews);
+
+        if (existingCount + nextNewFiles.length >= 5) {
+            setEditReportError('Maximum 5 images allowed.');
+        }
+    };
+
+    const handleRemoveExistingEditReportImage = (indexToRemove) => {
+        setEditReportExistingImageUrls((prev) => prev.filter((_, index) => index !== indexToRemove));
+        setEditReportError('');
+    };
+
+    const handleRemoveNewEditReportFile = (indexToRemove) => {
+        const nextFiles = editReportNewFiles.filter((_, index) => index !== indexToRemove);
+        editReportNewPreviews.forEach((url) => URL.revokeObjectURL(url));
+        const nextPreviews = nextFiles.map((file) => URL.createObjectURL(file));
+        setEditReportNewFiles(nextFiles);
+        setEditReportNewPreviews(nextPreviews);
+        setEditReportError('');
+    };
+
+    const handleSubmitEditReport = async () => {
+        if (!editingReport) return;
+
+        if (!editReportReason.trim()) {
+            setEditReportError('Reason is required.');
+            return;
+        }
+
+        try {
+            setEditReportSubmitting(true);
+            setEditReportError('');
+
+            const formData = new FormData();
+            formData.append('reason', editReportReason.trim());
+
+            editReportExistingImageUrls.forEach((url) => {
+                formData.append('imageUrls', url);
+            });
+
+            editReportNewFiles.forEach((file) => {
+                formData.append('evidenceImages', file);
+            });
+
+            await updateMyPendingReport(editingReport.reportId, formData);
+            await loadMyReports(user?.userId);
+            setMyReportsMessage('Report updated successfully.');
+            handleCloseEditReportModal();
+        } catch (err) {
+            setEditReportError(err.response?.data?.message || 'Failed to update report.');
+        } finally {
+            setEditReportSubmitting(false);
+        }
+    };
+
+    const handleDeletePendingReport = async (reportId) => {
+        const confirmed = window.confirm('Are you sure you want to delete this report?');
+        if (!confirmed) return;
+
+        try {
+            setMyReportsActionLoadingId(reportId);
+            setMyReportsError('');
+            setMyReportsMessage('');
+            await deleteMyPendingReport(reportId);
+            await loadMyReports(user?.userId);
+            setMyReportsMessage('Report deleted successfully.');
+        } catch (err) {
+            setMyReportsError(err.response?.data?.message || 'Failed to delete report.');
+        } finally {
+            setMyReportsActionLoadingId(null);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 flex">
             {/* Sidebar */}
@@ -451,6 +692,8 @@ export default function BuyerDashboard() {
                                     ? 'My Wishlist'
                                     : activeTab === 'reviewHistory'
                                         ? 'Review History'
+                                        : activeTab === 'reportHistory'
+                                            ? 'Report History'
                                         : 'My Profile'}
                         </h2>
                         <p className="text-sm text-gray-500 mt-1">
@@ -460,6 +703,8 @@ export default function BuyerDashboard() {
                                     ? 'Bikes you have saved for later.'
                                     : activeTab === 'reviewHistory'
                                         ? 'View, edit, or delete your seller reviews.'
+                                        : activeTab === 'reportHistory'
+                                            ? 'Track all reports you submitted to admin.'
                                     : 'View your personal account information.'}
                         </p>
                     </div>
@@ -566,7 +811,7 @@ export default function BuyerDashboard() {
                                                                 </button>
                                                             )}
                                                             <button
-                                                                onClick={() => alert('Report')}
+                                                                onClick={() => handleOpenReportModal(order)}
                                                                 className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium"
                                                             >
                                                                 Report
@@ -714,6 +959,99 @@ export default function BuyerDashboard() {
                                                         {reviewActionLoadingId === review.reviewId ? 'Deleting...' : 'Delete'}
                                                     </button>
                                                 </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        ) : activeTab === 'reportHistory' ? (
+                            <div className="space-y-4">
+                                {myReportsMessage && (
+                                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 px-4 py-3 text-sm">
+                                        {myReportsMessage}
+                                    </div>
+                                )}
+
+                                {myReportsLoading ? (
+                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Loading your reports...
+                                    </div>
+                                ) : myReportsError ? (
+                                    <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">
+                                        {myReportsError}
+                                    </div>
+                                ) : myReports.length === 0 ? (
+                                    <p className="text-sm text-gray-500">You haven't submitted any reports yet.</p>
+                                ) : (
+                                    myReports.map((report) => {
+                                        const status = String(report.status || '').toUpperCase();
+                                        const statusClass =
+                                            status === 'APPROVED'
+                                                ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                                                : status === 'REJECTED'
+                                                    ? 'text-red-700 bg-red-50 border-red-200'
+                                                    : 'text-amber-700 bg-amber-50 border-amber-200';
+
+                                        return (
+                                            <div key={report.reportId} className="rounded-xl border border-gray-200 p-4 bg-gray-50/60">
+                                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-gray-900">Report #{report.reportId}</p>
+                                                        <p className="text-sm text-gray-600 mt-1">Bike: {report.bikeTitle || '--'} {report.bikeId ? `(ID: ${report.bikeId})` : ''}</p>
+                                                        <p className="text-sm text-gray-600">Seller: {report.sellerName || (report.sellerId ? `#${report.sellerId}` : '--')}</p>
+                                                        <p className="text-xs text-gray-500 mt-1">{report.createdAt ? new Date(report.createdAt).toLocaleString('vi-VN') : '--'}</p>
+                                                    </div>
+
+                                                    <span className={`inline-flex items-center px-3 py-1 rounded-full border text-xs font-semibold ${statusClass}`}>
+                                                        {status || '--'}
+                                                    </span>
+                                                </div>
+
+                                                <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
+                                                    <p className="text-xs text-gray-500 mb-1">Reason</p>
+                                                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{report.reason || '--'}</p>
+                                                </div>
+
+                                                {Array.isArray(report.imageUrls) && report.imageUrls.length > 0 && (
+                                                    <div className="mt-3 flex flex-wrap gap-3">
+                                                        {report.imageUrls.map((imageUrl, index) => (
+                                                            <a
+                                                                key={`${report.reportId}-${index}`}
+                                                                href={imageUrl}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="block"
+                                                            >
+                                                                <img
+                                                                    src={imageUrl}
+                                                                    alt={`report-${report.reportId}-${index + 1}`}
+                                                                    className="w-28 h-20 rounded-lg object-cover border border-gray-200"
+                                                                />
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {status === 'PENDING' && (
+                                                    <div className="mt-4 flex flex-wrap gap-2">
+                                                        <button
+                                                            onClick={() => handleOpenEditReportModal(report)}
+                                                            disabled={myReportsActionLoadingId === report.reportId}
+                                                            className="px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium disabled:opacity-70"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeletePendingReport(report.reportId)}
+                                                            disabled={myReportsActionLoadingId === report.reportId}
+                                                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-70"
+                                                        >
+                                                            {myReportsActionLoadingId === report.reportId ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })
@@ -880,6 +1218,213 @@ export default function BuyerDashboard() {
                                 {quickReviewSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                                 Submit Review
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showReportModal && (
+                <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
+                    <div className="w-full max-w-2xl rounded-2xl bg-white border border-gray-200 p-6 max-h-[85vh] overflow-y-auto">
+                        <h3 className="text-xl font-semibold text-gray-900">Report Bike</h3>
+
+                        {reportSuccess ? (
+                            <div className="mt-5 space-y-4">
+                                <div className="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 px-4 py-3 text-sm">
+                                    Report submitted successfully.<br />
+                                    Admin will review your report.
+                                </div>
+
+                                <div className="flex justify-end">
+                                    <button
+                                        onClick={handleCloseReportModal}
+                                        className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white font-medium"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="mt-5 space-y-4">
+                                {reportError && (
+                                    <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">
+                                        {reportError}
+                                    </div>
+                                )}
+
+                                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                    <h4 className="font-semibold text-gray-900 mb-3">Bike Information</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                        <div><p className="text-gray-500">Bike Title</p><p className="font-medium text-gray-900">{reportOrder?.bikeTitle || '--'}</p></div>
+                                        <div><p className="text-gray-500">Bike ID</p><p className="font-medium text-gray-900">{reportOrder?.bikeId || '--'}</p></div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-gray-700">Reason</label>
+                                    <textarea
+                                        value={reportReason}
+                                        onChange={(e) => setReportReason(e.target.value)}
+                                        rows={4}
+                                        className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                        placeholder="Describe the issue with the bike..."
+                                    />
+                                </div>
+
+                                <div>
+                                    <p className="text-sm font-medium text-gray-700 mb-2">Upload Evidence Images</p>
+                                    <input
+                                        type="file"
+                                        accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                                        multiple
+                                        onChange={handleReportFileChange}
+                                        className="hidden"
+                                        id="report-images-upload"
+                                    />
+                                    <label
+                                        htmlFor="report-images-upload"
+                                        className="inline-flex items-center px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium cursor-pointer"
+                                    >
+                                        Upload Image
+                                    </label>
+
+                                    {reportFilePreviews.length > 0 && (
+                                        <div className="mt-3 flex flex-wrap gap-3">
+                                            {reportFilePreviews.map((previewUrl, index) => (
+                                                <div key={`${previewUrl}-${index}`} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
+                                                    <img src={previewUrl} alt={`evidence-${index + 1}`} className="w-full h-full object-cover" />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveReportFile(index)}
+                                                        className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 text-white text-xs px-1.5 py-0.5 rounded"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center justify-end gap-3">
+                                    <button
+                                        onClick={handleCloseReportModal}
+                                        disabled={reportSubmitting}
+                                        className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleSubmitReport}
+                                        disabled={reportSubmitting}
+                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium disabled:opacity-70"
+                                    >
+                                        {reportSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                        Submit Report
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {showEditReportModal && (
+                <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
+                    <div className="w-full max-w-2xl rounded-2xl bg-white border border-gray-200 p-6 max-h-[85vh] overflow-y-auto">
+                        <h3 className="text-xl font-semibold text-gray-900">Edit Report</h3>
+
+                        <div className="mt-5 space-y-4">
+                            {editReportError && (
+                                <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">
+                                    {editReportError}
+                                </div>
+                            )}
+
+                            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                <h4 className="font-semibold text-gray-900 mb-3">Bike Information</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                    <div><p className="text-gray-500">Bike Title</p><p className="font-medium text-gray-900">{editingReport?.bikeTitle || '--'}</p></div>
+                                    <div><p className="text-gray-500">Bike ID</p><p className="font-medium text-gray-900">{editingReport?.bikeId || '--'}</p></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-sm font-medium text-gray-700">Reason</label>
+                                <textarea
+                                    value={editReportReason}
+                                    onChange={(e) => setEditReportReason(e.target.value)}
+                                    rows={4}
+                                    className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                    placeholder="Describe the issue with the bike..."
+                                />
+                            </div>
+
+                            <div>
+                                <p className="text-sm font-medium text-gray-700 mb-2">Evidence Images</p>
+                                <input
+                                    type="file"
+                                    accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                                    multiple
+                                    onChange={handleEditReportFileChange}
+                                    className="hidden"
+                                    id="edit-report-images-upload"
+                                />
+                                <label
+                                    htmlFor="edit-report-images-upload"
+                                    className="inline-flex items-center px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium cursor-pointer"
+                                >
+                                    Upload Image
+                                </label>
+
+                                {(editReportExistingImageUrls.length > 0 || editReportNewPreviews.length > 0) && (
+                                    <div className="mt-3 flex flex-wrap gap-3">
+                                        {editReportExistingImageUrls.map((imageUrl, index) => (
+                                            <div key={`existing-${imageUrl}-${index}`} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
+                                                <img src={imageUrl} alt={`existing-${index + 1}`} className="w-full h-full object-cover" />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveExistingEditReportImage(index)}
+                                                    className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 text-white text-xs px-1.5 py-0.5 rounded"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        ))}
+
+                                        {editReportNewPreviews.map((previewUrl, index) => (
+                                            <div key={`new-${previewUrl}-${index}`} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
+                                                <img src={previewUrl} alt={`new-${index + 1}`} className="w-full h-full object-cover" />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveNewEditReportFile(index)}
+                                                    className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 text-white text-xs px-1.5 py-0.5 rounded"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex items-center justify-end gap-3">
+                                <button
+                                    onClick={handleCloseEditReportModal}
+                                    disabled={editReportSubmitting}
+                                    className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSubmitEditReport}
+                                    disabled={editReportSubmitting}
+                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white font-medium disabled:opacity-70"
+                                >
+                                    {editReportSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                    Save Changes
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
