@@ -198,6 +198,23 @@ export const createOrder = async (payload) => {
 };
 
 /**
+ * Add bike to buyer wishlist
+ * @param {{buyerId: number, bikeId: number}} payload
+ */
+export const addToWishlist = async (payload) => {
+    const response = await api.post('/Wishlists', payload);
+    return response.data;
+};
+
+/**
+ * Get all wishlist items (buyer will be filtered on client side)
+ */
+export const getWishlists = async () => {
+    const response = await api.get('/Wishlists');
+    return response.data;
+};
+
+/**
  * Buyer confirms received bike
  * @param {number} orderId
  */

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getBikeById, uploadBikeImage, deleteBikeImage } from '@/services/api';
-import { ArrowLeft, User, MapPin, CheckCircle, Tag, ImagePlus, Loader2, Trash2, AlertTriangle, ShieldCheck, FileText } from 'lucide-react';
+import { addToWishlist, getBikeById, uploadBikeImage, deleteBikeImage } from '@/services/api';
+import { ArrowLeft, User, MapPin, CheckCircle, Tag, ImagePlus, Loader2, Trash2, AlertTriangle, ShieldCheck, FileText, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function BikeDetails() {
@@ -13,6 +13,7 @@ export default function BikeDetails() {
     const [user, setUser] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+    const [wishlistState, setWishlistState] = useState({ loading: false, success: false, error: '' });
 
     const fetchBikeDetails = async () => {
         try {
@@ -86,6 +87,7 @@ export default function BikeDetails() {
     };
 
     const isOwner = user && bike && user.userId === bike.sellerId;
+    const isBuyer = user?.roleName?.toUpperCase() === 'BUYER';
     const bikeStatus = (bike?.status || bike?.bikeStatus || '').toUpperCase();
     const inspectionStatus = (bike?.inspectionStatus || bike?.InspectionStatus || '').toUpperCase();
     const isInspected = bike?.isInspected ?? bike?.IsInspected ?? false;
@@ -124,6 +126,45 @@ export default function BikeDetails() {
                 bikeTitle: bike.title,
             },
         });
+    };
+
+    const handleAddToWishlist = async () => {
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+
+        if (user?.roleName?.toUpperCase() !== 'BUYER') {
+            setWishlistState({ loading: false, success: false, error: 'Only buyers can use wishlist.' });
+            return;
+        }
+
+        if (!bike?.bikeId) {
+            setWishlistState({ loading: false, success: false, error: 'Bike not found.' });
+            return;
+        }
+
+        try {
+            setWishlistState({ loading: true, success: false, error: '' });
+            await addToWishlist({
+                buyerId: Number(user.userId),
+                bikeId: Number(bike.bikeId),
+            });
+            setWishlistState({ loading: false, success: true, error: '' });
+        } catch (err) {
+            const serverMessage = err.response?.data?.message || err.response?.data || '';
+            const fallbackMessage = 'Unable to add this bike to wishlist.';
+            const normalizedMessage = typeof serverMessage === 'string' ? serverMessage : fallbackMessage;
+
+            setWishlistState({
+                loading: false,
+                success: false,
+                error:
+                    err.response?.status === 409
+                        ? 'This bike is already in your wishlist.'
+                        : normalizedMessage || fallbackMessage,
+            });
+        }
     };
 
     if (loading) {
@@ -360,6 +401,20 @@ export default function BikeDetails() {
                             </div>
                         </div>
                         <div className="flex gap-3 mt-4">
+                            {isBuyer && !isOwner && (
+                                <button
+                                    onClick={handleAddToWishlist}
+                                    disabled={wishlistState.loading || wishlistState.success}
+                                    className="flex-1 inline-flex items-center justify-center gap-2 bg-white hover:bg-gray-100 text-gray-800 font-bold py-3 px-4 rounded-lg transition-colors border border-gray-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                                >
+                                    {wishlistState.loading ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <Heart className="w-4 h-4" />
+                                    )}
+                                    {wishlistState.success ? 'Added to Wishlist' : 'Add to Wishlist'}
+                                </button>
+                            )}
                             <button
                                 onClick={handleChatWithSeller}
                                 disabled={user?.userId === bike.sellerId}
@@ -374,6 +429,12 @@ export default function BikeDetails() {
                                 Order Now
                             </button>
                         </div>
+                        {wishlistState.error && (
+                            <p className="text-sm text-red-600">{wishlistState.error}</p>
+                        )}
+                        {wishlistState.success && (
+                            <p className="text-sm text-emerald-600">Bike has been saved to your wishlist.</p>
+                        )}
                     </div>
 
                     <div className="mt-2 text-gray-700">

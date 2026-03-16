@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, Heart, Store, LogOut, CheckCircle, AlertCircle, Loader2, PackageCheck, UserCircle2, Star } from 'lucide-react';
-import { confirmOrderReceived, createBikeReport, createReview, deleteMyPendingReport, deleteReview, getBikeById, getMyReports, getOrders, getReviews, getUserById, requestSellerRole, updateMyPendingReport, updateReview } from '@/services/api';
+import { confirmOrderReceived, createBikeReport, createReview, deleteMyPendingReport, deleteReview, getBikeById, getMyReports, getOrders, getReviews, getUserById, getWishlists, requestSellerRole, updateMyPendingReport, updateReview } from '@/services/api';
 
 const menuItems = [
     { key: 'profile', label: 'My Profile', icon: <UserCircle2 className="w-5 h-5" /> },
@@ -63,6 +63,9 @@ export default function BuyerDashboard() {
     const [editReportNewPreviews, setEditReportNewPreviews] = useState([]);
     const [editReportError, setEditReportError] = useState('');
     const [editReportSubmitting, setEditReportSubmitting] = useState(false);
+    const [wishlistItems, setWishlistItems] = useState([]);
+    const [wishlistLoading, setWishlistLoading] = useState(false);
+    const [wishlistError, setWishlistError] = useState('');
     const navigate = useNavigate();
 
     const loadOrders = async (buyerId) => {
@@ -114,6 +117,46 @@ export default function BuyerDashboard() {
         }
     };
 
+    const loadWishlist = async (buyerId) => {
+        try {
+            setWishlistLoading(true);
+            setWishlistError('');
+
+            const data = await getWishlists();
+            const buyerWishlist = (Array.isArray(data) ? data : [])
+                .filter((item) => Number(item.buyerId) === Number(buyerId))
+                .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+            if (buyerWishlist.length === 0) {
+                setWishlistItems([]);
+                return;
+            }
+
+            const bikeDetailsEntries = await Promise.all(
+                buyerWishlist.map(async (item) => {
+                    try {
+                        const bikeDetail = await getBikeById(item.bikeId);
+                        return {
+                            ...item,
+                            bikeDetail,
+                        };
+                    } catch {
+                        return {
+                            ...item,
+                            bikeDetail: null,
+                        };
+                    }
+                })
+            );
+
+            setWishlistItems(bikeDetailsEntries);
+        } catch (err) {
+            setWishlistError(err.response?.data?.message || 'Failed to load your wishlist.');
+        } finally {
+            setWishlistLoading(false);
+        }
+    };
+
     useEffect(() => {
         const initUser = async () => {
             const userDataString = localStorage.getItem('user');
@@ -129,11 +172,13 @@ export default function BuyerDashboard() {
                 loadOrders(mergedUser.userId);
                 loadMyReviews(mergedUser.userId);
                 loadMyReports(mergedUser.userId);
+                loadWishlist(mergedUser.userId);
             } catch {
                 setUser(parsedUser);
                 loadOrders(parsedUser.userId);
                 loadMyReviews(parsedUser.userId);
                 loadMyReports(parsedUser.userId);
+                loadWishlist(parsedUser.userId);
             }
         };
 
@@ -827,15 +872,79 @@ export default function BuyerDashboard() {
                                 )}
                             </>
                         ) : activeTab === 'wishlist' ? (
-                            <div className="flex flex-col items-center justify-center h-full pt-12 pb-20">
-                                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                                    <Heart className="w-8 h-8 text-gray-400" />
+                            wishlistLoading ? (
+                                <div className="flex items-center gap-2 text-sm text-gray-500">
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Loading your wishlist...
                                 </div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-1">No items in wishlist yet</h3>
-                                <p className="text-gray-500 text-sm mb-6 text-center max-w-sm">
-                                    Save bikes you like to your wishlist to easily find them later.
-                                </p>
-                            </div>
+                            ) : wishlistError ? (
+                                <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">
+                                    {wishlistError}
+                                </div>
+                            ) : wishlistItems.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-full pt-12 pb-20">
+                                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                                        <Heart className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-1">No items in wishlist yet</h3>
+                                    <p className="text-gray-500 text-sm mb-6 text-center max-w-sm">
+                                        Save bikes you like to your wishlist to easily find them later.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {wishlistItems.map((item) => {
+                                        const bike = item.bikeDetail;
+                                        const bikeTitle = bike?.title || item.bikeTitle || `Bike #${item.bikeId}`;
+                                        const bikeImage = bike?.imageUrls?.[0] || bike?.imageUrl || null;
+                                        const bikePrice = Number(bike?.price || 0);
+
+                                        return (
+                                            <div key={item.wishlistId} className="rounded-xl border border-gray-200 p-4 bg-gray-50/60">
+                                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                                    <div className="flex items-center gap-3">
+                                                        {bikeImage ? (
+                                                            <img
+                                                                src={bikeImage}
+                                                                alt={bikeTitle}
+                                                                className="w-24 h-16 rounded-lg object-cover border border-gray-200"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-24 h-16 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-xs text-gray-500">
+                                                                No image
+                                                            </div>
+                                                        )}
+                                                        <div>
+                                                            <p className="font-semibold text-gray-900">{bikeTitle}</p>
+                                                            <p className="text-sm text-gray-500 mt-1">
+                                                                Added: {item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : '--'}
+                                                            </p>
+                                                            <p className="text-sm font-medium text-gray-700 mt-1">
+                                                                {bikePrice > 0 ? `${bikePrice.toLocaleString('vi-VN')}₫` : 'Contact for price'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => navigate(`/bike/${item.bikeId}`)}
+                                                            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg text-sm font-medium"
+                                                        >
+                                                            View Detail
+                                                        </button>
+                                                        <button
+                                                            onClick={() => navigate(`/checkout/${item.bikeId}`)}
+                                                            className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-medium"
+                                                        >
+                                                            Order Now
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )
                         ) : activeTab === 'reviewHistory' ? (
                             <div className="space-y-4">
                                 {reviewActionMessage && (
