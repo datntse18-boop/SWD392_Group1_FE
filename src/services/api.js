@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'https://localhost:7271/api',
+    baseURL: 'http://localhost:5026/api',
     headers: {
         'Content-Type': 'application/json',
     },
@@ -435,6 +435,24 @@ export const getConversationMessages = async (user1Id, user2Id, bikeId = null) =
  */
 export const getMessageInbox = async (userId) => {
     const response = await api.get(`/Messages/inbox/${userId}`);
+    return response.data;
+};
+
+/**
+ * FR-11: Get inspection history for a specific bike
+ * @param {number} bikeId
+ */
+export const getInspectionHistoryByBike = async (bikeId) => {
+    const response = await api.get(`/InspectionReports/bike/${bikeId}/history`);
+    return response.data;
+};
+
+/**
+ * FR-12: Request re-inspection for a previously rejected report
+ * @param {number} reportId
+ */
+export const requestReInspection = async (reportId) => {
+    const response = await api.post(`/InspectionReports/${reportId}/re-inspect`);
     return response.data;
 };
 
