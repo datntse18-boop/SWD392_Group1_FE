@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'https://localhost:7271/api',
+    // baseURL: 'https://localhost:7271/api',
+    baseURL: 'http://localhost:5026/api',
     headers: {
         'Content-Type': 'application/json',
     },
@@ -435,6 +436,15 @@ export const getConversationMessages = async (user1Id, user2Id, bikeId = null) =
  */
 export const getMessageInbox = async (userId) => {
     const response = await api.get(`/Messages/inbox/${userId}`);
+    return response.data;
+};
+
+/**
+ * Suggest bikes via Chatbot
+ * @param {Object} payload 
+ */
+export const suggestBikes = async (payload) => {
+    const response = await api.post('/Chatbot/suggest', payload);
     return response.data;
 };
 

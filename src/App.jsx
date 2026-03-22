@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Chatbot from '@/components/Chatbot';
 import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
 import Homepage from '@/pages/Homepage';
@@ -20,6 +21,7 @@ import PaymentPage from '@/pages/PaymentPage';
 function App() {
   return (
     <Router>
+      <Chatbot />
       <Routes>
         <Route path="/" element={<Homepage />} />
         <Route path="/bike/:id" element={<BikeDetails />} />
